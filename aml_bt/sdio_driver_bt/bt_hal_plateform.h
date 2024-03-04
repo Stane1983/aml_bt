@@ -37,16 +37,22 @@ extern int  aml_w1_sdio_init(void);
 
 #define PRINT(...)      do { printk("btHAL->"); printk(__VA_ARGS__); } while (0)
 
+#if 1
 #define CHIP_BT_PMU_REG_BASE               (0xf03000)
+#define RG_BT_PMU_A11                             (CHIP_BT_PMU_REG_BASE + 0x2c)
 #define RG_BT_PMU_A12                             (CHIP_BT_PMU_REG_BASE + 0x30)
 #define RG_BT_PMU_A13                             (CHIP_BT_PMU_REG_BASE + 0x34)
-#define RG_BT_PMU_A14                                                     (CHIP_BT_PMU_REG_BASE + 0x38)
+#define RG_BT_PMU_A14                             (CHIP_BT_PMU_REG_BASE + 0x38)
 #define RG_BT_PMU_A15                             (CHIP_BT_PMU_REG_BASE + 0x3c)
 #define RG_BT_PMU_A16                             (CHIP_BT_PMU_REG_BASE + 0x40)
 #define RG_BT_PMU_A17                             (CHIP_BT_PMU_REG_BASE + 0x44)
 #define RG_BT_PMU_A18                             (CHIP_BT_PMU_REG_BASE + 0x48)
 #define RG_BT_PMU_A20                             (CHIP_BT_PMU_REG_BASE + 0x50)
 #define RG_BT_PMU_A22                             (CHIP_BT_PMU_REG_BASE + 0x58)
+
+#define CHIP_INTF_REG_BASE               (0xf00000)
+#define RG_AON_A15                                (CHIP_INTF_REG_BASE + 0x3c)
+#endif
 
 #define SDIO_FUNC1 1
 
@@ -74,6 +80,22 @@ extern int  aml_w1_sdio_init(void);
 #define BT_PWR_OFF 0
 
 typedef unsigned long SYS_TYPE;
+
+enum {
+    AML_BT_EN = 0x1,
+    AML_SDIO_EN,
+};
+
+enum {
+    AML_SINGLE_ANTENNA = 0x1,
+    AML_DOUBLE_ANTENNA,
+};
+
+enum {
+    AML_W1 = 0x1,
+    AML_W1U,
+};
+
 
 struct amlw1_hif_ops {
 	int				(*hi_bottom_write8)(unsigned char func_num, int addr, unsigned char data);
