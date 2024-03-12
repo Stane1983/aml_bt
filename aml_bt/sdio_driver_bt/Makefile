@@ -12,7 +12,10 @@ $(AMLBT_MOD_NAME)-objs := $(AMLBT_CFILES:.c=.o)
 ###############################################################################
 # Common
 ###############################################################################
-obj-m := $(AMLBT_MOD_NAME).o
+obj-m += aml_sdio.o
+aml_sdio-objs += w1_sdio.o
+
+obj-m += $(AMLBT_MOD_NAME).o
 
 all:
 	make -C $(KERNEL_SRC) M=$(M) modules

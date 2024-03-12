@@ -6,7 +6,7 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/platform_device.h>
-
+#include <linux/version.h>
 
 extern unsigned char (*host_wake_w1_req)(void);
 static int reg_config_complete = 0;
@@ -506,7 +506,11 @@ static int BTAML_init(void)
     PRINT("%s driver(major %d) installed.\n",
           "BT_sdiodev", BTAML_major);
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 16, 20)
     pBTClass = class_create(THIS_MODULE, "BT_sdiodev");
+#else
+    pBTClass = class_create("BT_sdiodev");
+#endif
     if (IS_ERR(pBTClass))
     {
         pr_err("class create fail, error code(%ld)\n",
