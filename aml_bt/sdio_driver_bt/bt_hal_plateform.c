@@ -26,7 +26,10 @@ extern void aml_wifi_sdio_power_unlock(void);
 
 static int bt_aml_insmod(void);
 static void bt_aml_rmmod(void);
+
+#ifdef CONFIG_AMLOGIC_GX_SUSPEND
 extern unsigned int get_resume_method(void);
+#endif
 
 static int config_bt_pmu_reg(bool is_power_on)
 {
@@ -423,6 +426,7 @@ static int amlbt_sdio_suspend(struct platform_device *dev, pm_message_t state)
 
 static int amlbt_sdio_resume(struct platform_device *dev)
 {
+#ifdef CONFIG_AMLOGIC_GX_SUSPEND
     if ((get_resume_method() != 3) && (get_resume_method() != 7))
     {
         unsigned int reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
@@ -431,6 +435,7 @@ static int amlbt_sdio_resume(struct platform_device *dev)
         g_w1_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
         printk("RG_AON_A15:%#x", g_w1_hif_ops.bt_hi_read_word(RG_AON_A15));
     }
+#endif
     return 0;
 }
 
