@@ -111,9 +111,13 @@ int aml_init(int fd, char *bdaddr);
 #define TCI_UPDATE_UART_BAUDRATE					    0xfef2
 #define TCI_DOWNLOAD_BT_FW							    0xfef3
 #define HCI_VSC_WRITE_BD_ADDR                           0xFC1A
+#define HCI_VSC_WAKE_WRITE_DATA                         0xFC22
+
 
 /*aml fw path*/
-#define AML_BT_PATH "/lib/firmware/w1u"
+//#define AML_BT_PATH "/lib/firmware/w1u"
+#define AML_BT_PATH "/lib/firmware/aml"
+#define FW_VER_FILE "/tmp/bt_fw_version"
 
 /**********a2dp mode cfg**********/
 #define AML_A2DP_CFG_FILE AML_BT_PATH"/a2dp_mode_cfg.txt"
@@ -143,12 +147,11 @@ int aml_init(int fd, char *bdaddr);
 #define HCI_CMD_IND            (1)
 #define HCI_COMMAND_HDR_SIZE   (3)
 
-/*
 typedef struct {
 	unsigned short    opcode;
 	unsigned char     plen;
 } __attribute__ ((packed))  hci_command_hdr;
-*/
+
 
 typedef enum _download_fw_status
 {

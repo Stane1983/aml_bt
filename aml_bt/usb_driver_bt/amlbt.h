@@ -18,10 +18,10 @@ typedef unsigned long SYS_TYPE;
 
 #define USB_TX_Q_LEN            (1032)
 #define USB_RX_Q_LEN            (1032)
-#define USB_EVENT_Q_LEN         (1024)
+#define USB_EVENT_Q_LEN         (2048)
 #define USB_RX_INDEX_FIFO_LEN   (20)
 #define USB_RX_TYPE_FIFO_LEN    (256)
-#define USB_POLL_TOTAL_LEN      (1340)      //event addr offset:0x13c + event size:1024
+#define USB_POLL_TOTAL_LEN      (2364)      //event addr offset:0x13c + event size:2048
 #define USB_DOWNLOAD_LEN        (20*1024)
 #define USB_TX_Q_NUM            (8)
 

@@ -567,7 +567,6 @@ int main(int argc, char *argv[])
 #include <unistd.h>
 //#include "hcitool_for_usb.h"
 #include "hciattach.h"
-#include "hciattach_aml.h"
 #define CMD_TEST_FW _IOR('A', 2, int)
 #define MAC_LEN 6
 #define SAVE_MAC "/nvram/bt_mac"
@@ -588,8 +587,18 @@ u_int32 DCCM_LEN = 0;
 
 #define UINT8_TO_STREAM(p, u8)   { *(p)++ = (uint8_t)(u8); }
 #define UINT16_TO_STREAM(p, u16) { *(p)++ = (uint8_t)(u16); *(p)++ = (uint8_t)((u16) >> 8); }
-#define set_bdaddr_delay 50
+#define set_bdaddr_delay 40
+//#define W2L_CHIPSET
+#define W2_CHIPSET
+//#define W1U_CHIPSET
 
+#if defined(W2L_CHIPSET)
+    #define CHIP_OFFSET (384 * 1024)
+#elif defined(W1U_CHIPSET) || defined(W2_CHIPSET)
+    #define CHIP_OFFSET (256 * 1024)
+#else
+    #error "No chipset defined. Please define W1U_CHIPSET, W2_CHIPSET, or W2L_CHIPSET."
+#endif
 
 /******************************************************************************
 **  delay function
@@ -878,8 +887,8 @@ int download_fw_img()
 	u_int32 cmd_len = 0;
 	u_int32 data_len = 0;
 	int cnt = 1;
-    offset_in_bt = 256*1024;
-    offset = 256*1024;
+	offset_in_bt = CHIP_OFFSET;
+	offset = CHIP_OFFSET;
 	len = ICCM_LEN - offset_in_bt;//ALIGN(sizeof(BT_fwICCM), 4) -256*1024;
 	printf("BT start iccm copy, total=0x%x \n", len);
 
@@ -935,7 +944,7 @@ int start_download_firmware(char* firmware_file_path)
     unsigned int iccm_size = 0;
     unsigned int dccm_size = 0;
     int size = 0;
-    char fw_bin_file[256];
+    char fw_bin_file[384];
     int result = 0;
     int revData = -1;
 	uint32_t reg_data = 0;
@@ -1282,6 +1291,74 @@ error:
 	return 0;
 }
 
+int aml_set_APCF_config(int fd)
+{
+	int size;
+	int err = -1;
+	unsigned char cmd[HCI_MAX_CMD_SIZE];
+	unsigned char rsp[HCI_MAX_EVENT_SIZE];
+	char *cmd_hdr = NULL;
+	int write_bytes = 0;
+
+	unsigned char APCF_config_manf_data[] = {0x01, 0x22, 0xFC, 0x05, 0x19, 0xff, 0x01, 0x0a, 0xb};
+	unsigned char apcf_config[9] = {0x01, 0x22, 0xFC, 0x05, 0x19, 0xff, 0x01, 0x0a, 0xb};
+
+
+	pr_info("set APCF: %02x:%02x:%02x:%02x:%02x:%02x", apcf_config[0],apcf_config[1], apcf_config[2], apcf_config[3], apcf_config[4], apcf_config[5]);
+
+	memset(cmd, 0x0, HCI_MAX_CMD_SIZE);
+	memset(rsp, 0x0, HCI_MAX_EVENT_SIZE);
+
+	cmd_hdr = (void *) (cmd + 1);
+	cmd[0]	= HCI_COMMAND_PKT;
+	UINT16_TO_STREAM(cmd_hdr, HCI_VSC_WAKE_WRITE_DATA);
+	*cmd_hdr++ = 5;
+	*cmd_hdr++ = APCF_config_manf_data[4];
+	*cmd_hdr++ = APCF_config_manf_data[5];
+	*cmd_hdr++ = APCF_config_manf_data[6];
+	*cmd_hdr++ = APCF_config_manf_data[7];
+	*cmd_hdr++ = APCF_config_manf_data[8];
+
+	size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE + 5);
+	/* Send the HCI command packet to UART for transmission */
+	pr_info("HCI CMD: 0x%x 0x%x 0x%x 0x%x", cmd[0], cmd[1], cmd[2], cmd[3]);
+
+	u_int8 hcitype[] = {HCI_pduCOMMAND};
+	write_bytes = write(fd, hcitype, 1);
+
+	if (write_bytes)
+	{
+		err = write(fd, cmd +1, size-1);
+		if (err != size-1) {
+			pr_err("Send failed with ret value: %d", err);
+			goto error;
+		}
+	}
+	else
+	{
+		goto error;
+	}
+
+	//delay 20ms wait event
+	ms_delay(20);
+	pr_info("delay %d",20);
+
+	/* Wait for command complete event */
+	err = read_event(rsp);
+	if ( err < 0) {
+		pr_err("Failed to set apcf config on Controller");
+		goto error;
+	}
+
+	pr_info("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6]);
+	pr_info("hci set apcf success %d",err);
+	return err;
+error:
+	return err;
+	pr_info("hci set apcf error");
+}
+
+
 int aml_set_bdaddr(int fd)
 {
 	int size;
@@ -1492,6 +1569,13 @@ void handle_usr_command(int argc,char *argv[])
 				printf("HCI set bdaddr Failed\n !!!");
 			}
 			printf("HCI set bdaddr is done\n");
+
+			err = aml_set_APCF_config(g_usb_fd);
+			if (err < 0)
+			{
+				printf("HCI set APCF Failed\n !!!");
+			}
+			printf("HCI set APCF is done\n");
         }
     }
 	else if (strcmp("reset", argv[0]) == 0)
