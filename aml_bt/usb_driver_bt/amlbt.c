@@ -3615,7 +3615,7 @@ static int amlbt_read(unsigned char *buf_p)
 static void amlbt_receive(struct work_struct *work)
 {
 	unsigned char buf[1024] = {0};
-	int i, len;
+	int i, len=0;
 
 	struct aml_bt_info *info = container_of(work, struct aml_bt_info, receive_work);
 
@@ -3634,6 +3634,14 @@ static void amlbt_receive(struct work_struct *work)
 	}
 
 	len = amlbt_read(buf);
+
+	if (len == 0) {
+		//BTF("fifo no data sleep 10ms\n");
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(msecs_to_jiffies(10));
+		schedule_work(&info->receive_work);
+	return;
+	}
 
 	for (i = 0; i < len; i++) {
 
