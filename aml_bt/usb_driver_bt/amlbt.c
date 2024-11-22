@@ -4914,6 +4914,7 @@ static int amlbt_usb_suspend(struct platform_device *dev, pm_message_t state)
 	BTF("%s\n", __func__);
 
     suspend_value = 1;
+    /*
     if (FAMILY_TYPE_IS_W2(amlbt_if_type) || FAMILY_TYPE_IS_W2L(amlbt_if_type))
     {
         unsigned int reg_value = amlbt_usb_read_word(RG_AON_A52, BT_EP);
@@ -4922,6 +4923,7 @@ static int amlbt_usb_suspend(struct platform_device *dev, pm_message_t state)
         amlbt_usb_write_word(RG_AON_A52, reg_value, BT_EP);
         BTF("RG_AON_A52:%#x", amlbt_usb_read_word(RG_AON_A52, BT_EP));
     }
+    */
 	BTF("suspend_value %d\n", suspend_value);
     return 0;
 }
@@ -4930,7 +4932,7 @@ static int amlbt_usb_resume(struct platform_device *dev)
 {
     BTF("%s\n", __func__);
     msleep(1500);
-
+    /*
     if (FAMILY_TYPE_IS_W2(amlbt_if_type))
     {
             unsigned int reg_value = amlbt_usb_read_word(RG_AON_A52, BT_EP);
@@ -4939,6 +4941,7 @@ static int amlbt_usb_resume(struct platform_device *dev)
             amlbt_usb_write_word(RG_AON_A52, reg_value, BT_EP);
             BTF("RG_AON_A52:%#x", amlbt_usb_read_word(RG_AON_A52, BT_EP));
     }
+    */
 	suspend_value = 0;
 	BTF("suspend_value %d\n", suspend_value);
 
