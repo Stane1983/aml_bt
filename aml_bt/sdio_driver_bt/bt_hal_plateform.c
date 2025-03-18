@@ -405,13 +405,21 @@ static int amlbt_sdio_probe(struct platform_device *dev)
     return ret;
 }
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 11, 0)
+static void amlbt_sdio_remove(struct platform_device *dev)
+#else
 static int amlbt_sdio_remove(struct platform_device *dev)
+#endif
 {
     printk("%s \n", __func__);
 
     bt_aml_rmmod();
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 11, 0)
+    return;
+#else
     return 0;
+#endif
 }
 
 static int amlbt_sdio_suspend(struct platform_device *dev, pm_message_t state)
