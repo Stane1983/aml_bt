@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-*  Copyright (C) 2025 Amlogic Corporation
+*  Copyright (C) 2019-2025 Amlogic Corporation
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -83,6 +83,7 @@ struct _gdsl_fifo_t
 struct aml_coex_struct {
 	struct sk_buff *rx_skb;
 	struct sk_buff_head txq;
+	struct sk_buff_head rxq;      // 接收队列
 };
 
 #if 0
@@ -105,16 +106,9 @@ extern int g_dbg_level;
 #define BTE(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_ERROR) printk(KERN_INFO "BTE:" fmt, ## arg)
 #define BTF(fmt, arg...) if (g_dbg_level >= LOG_LEVEL_FATAL) printk(KERN_INFO "BTF:" fmt, ## arg)
 
-
-gdsl_fifo_t *gdsl_fifo_init(unsigned int len, unsigned char *base_addr);
-void gdsl_fifo_deinit(gdsl_fifo_t *p_fifo);
-unsigned int gdsl_fifo_used(gdsl_fifo_t *p_fifo);
-unsigned int gdsl_fifo_remain(gdsl_fifo_t *p_fifo);
-unsigned int gdsl_fifo_get_data(gdsl_fifo_t *p_fifo, unsigned char *buff, unsigned int len);
-unsigned int gdsl_fifo_copy_data(gdsl_fifo_t *p_fifo, unsigned char *buff, unsigned int len);
-struct sk_buff *h4_recv_buf(struct hci_dev *hdev, struct sk_buff *skb,
-                const unsigned char *buffer, int count,
-                const struct h4_recv_pkt *pkts, int pkts_count);
+//struct sk_buff *h4_recv_buf(struct hci_dev *hdev, struct sk_buff *skb,
+//                const unsigned char *buffer, int count,
+//                const struct h4_recv_pkt *pkts, int pkts_count);
 struct aml_coex_struct *aml_coex_struct_get(void);
 struct hci_uart *aml_coex_hci_get(void);
 

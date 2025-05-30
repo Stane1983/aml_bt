@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-*  Copyright (C) 2025 Amlogic Corporation
+*  Copyright (C) 2019-2025 Amlogic Corporation
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -49,12 +49,12 @@
 #include "hci_aml_thread.h"
 #include "hci_aml_zigbee.h"
 
-#define AML_COEX_VERSION    "2025-03-19,15:02"
+#define AML_COEX_VERSION    "2025-0526,15:00"
 
 struct aml_coex_struct *aml_coex;
 struct hci_uart *amlhci;
 
-int g_dbg_level = LOG_LEVEL_INFO; // 默认调试级别
+int g_dbg_level = LOG_LEVEL_INFO; //Default printing level
 
 static struct dentry *debug_dir;
 
@@ -130,100 +130,6 @@ struct hci_uart *aml_coex_hci_get(void)
     return amlhci;
 }
 
-
-gdsl_fifo_t *gdsl_fifo_init(unsigned int len, unsigned char *base_addr)
-{
-    gdsl_fifo_t *p_fifo = (gdsl_fifo_t *)kzalloc(sizeof(gdsl_fifo_t), GFP_DMA|GFP_ATOMIC);
-
-    BTD("%s \n", __func__);
-
-    if (p_fifo)
-    {
-        memset(p_fifo, 0, sizeof(gdsl_fifo_t));
-        p_fifo->w = 0;
-        p_fifo->r = 0;
-        p_fifo->base_addr = base_addr;
-        p_fifo->size = len;
-    }
-
-    return p_fifo;
-}
-
-void gdsl_fifo_deinit(gdsl_fifo_t *p_fifo)
-{
-    if (p_fifo == NULL)
-    {
-        return ;
-    }
-
-    kfree(p_fifo);
-}
-
-unsigned int gdsl_fifo_used(gdsl_fifo_t *p_fifo)
-{
-    if (p_fifo->r <= p_fifo->w)
-        return (p_fifo->w - p_fifo->r);
-
-    return (p_fifo->size + p_fifo->w - p_fifo->r);
-}
-
-unsigned int gdsl_fifo_remain(gdsl_fifo_t *p_fifo)
-{
-    unsigned int used = gdsl_fifo_used(p_fifo);
-
-    return p_fifo->size - used - 4;
-}
-
-unsigned int gdsl_fifo_get_data(gdsl_fifo_t *p_fifo, unsigned char *buff, unsigned int len)
-{
-    unsigned int used = gdsl_fifo_used(p_fifo);
-    unsigned int i = 0;
-    unsigned int get_len = (len >= used ? used : len);
-
-    BTD("get d %d, r:%#lx, w:%#lx\n", get_len, (unsigned long)p_fifo->r, (unsigned long)p_fifo->w);
-    if (used == 0)
-    {
-        return 0;
-    }
-
-    while (i < get_len)
-    {
-        buff[i] = *(unsigned char *)((unsigned long)p_fifo->r + (unsigned long)p_fifo->base_addr);
-        p_fifo->r = (unsigned char *)(((unsigned long)p_fifo->r + 1) % p_fifo->size);
-        i++;
-    }
-
-    BTD("gdsl_fifo_get_data actual len %d \n", i);
-
-    return i;
-}
-
-unsigned int gdsl_fifo_copy_data(gdsl_fifo_t *p_fifo, unsigned char *buff, unsigned int len)
-{
-    unsigned int i = 0;
-    BTD("copy len %d, base_addr:%#lx, w:%#lx\n", len, (unsigned long)p_fifo->base_addr, (unsigned long)p_fifo->w);
-
-    if (gdsl_fifo_remain(p_fifo) < len)
-    {
-        BTF("gdsl_fifo_copy_data no space!!\n");
-        BTF("fifo->base_addr %#lx, fifo->size %#x\n", (unsigned long)p_fifo->base_addr, p_fifo->size);
-        BTF("fifo->w %#lx, fifo->r %#lx\n", (unsigned long)p_fifo->w, (unsigned long)p_fifo->r);
-        BTF("remain %#x, len %#x\n", gdsl_fifo_remain(p_fifo), len);
-        return 0;
-    }
-
-    while (i < len)
-    {
-        *(unsigned char *)((unsigned long)p_fifo->w + (unsigned long)p_fifo->base_addr) = buff[i];
-        p_fifo->w = (unsigned char *)(((unsigned long)p_fifo->w + 1) % p_fifo->size);
-        i++;
-    }
-
-    BTD("gdsl_fifo_copy_data actual len %d\n", i);
-
-    return i;
-}
-
 struct sk_buff *aml_h4_recv_buf(struct hci_dev *hdev, struct sk_buff *skb,
                 const unsigned char *buffer, int count,
                 const struct h4_recv_pkt *pkts, int pkts_count)
@@ -234,7 +140,7 @@ struct sk_buff *aml_h4_recv_buf(struct hci_dev *hdev, struct sk_buff *skb,
     /* Check for error from previous call */
     if (IS_ERR(skb))
     {
-        BTE("%s skb err\n", __func__);
+        BTF("%s skb err\n", __func__);
         skb = NULL;
     }
     BTD("%s:count:%d\n", __func__, count);
@@ -258,8 +164,10 @@ struct sk_buff *aml_h4_recv_buf(struct hci_dev *hdev, struct sk_buff *skb,
                 skb = bt_skb_alloc((&pkts[i])->maxlen,
                            GFP_ATOMIC);
                 if (!skb)
+                {
+                BTF("%s bt_skb_alloc failed\n", __func__);
                     return ERR_PTR(-ENOMEM);
-
+                }
                 hci_skb_pkt_type(skb) = (&pkts[i])->type;
                 hci_skb_expect(skb) = (&pkts[i])->hlen;
                 break;
@@ -268,8 +176,10 @@ struct sk_buff *aml_h4_recv_buf(struct hci_dev *hdev, struct sk_buff *skb,
 
             /* Check for invalid packet type */
             if (!skb)
+            {
                 return ERR_PTR(-EILSEQ);
-
+                BTF("%s invalid packet type: %#x\n", __func__, buffer[0]);
+            }
             count -= 1;
             buffer += 1;
         }
@@ -293,6 +203,7 @@ struct sk_buff *aml_h4_recv_buf(struct hci_dev *hdev, struct sk_buff *skb,
         }
 
         if (i >= pkts_count) {
+        BTF("%s unknown packet type in completion: %#x\n", __func__, hci_skb_pkt_type(skb));
             kfree_skb(skb);
             return ERR_PTR(-EILSEQ);
         }
@@ -312,6 +223,7 @@ struct sk_buff *aml_h4_recv_buf(struct hci_dev *hdev, struct sk_buff *skb,
                 BTD("1 dlen %#x\n", dlen);
 
                 if (skb_tailroom(skb) < dlen) {
+                BTF("%s lsize=1, tailroom insufficient\n", __func__);
                     kfree_skb(skb);
                     return ERR_PTR(-EMSGSIZE);
                 }
@@ -324,6 +236,7 @@ struct sk_buff *aml_h4_recv_buf(struct hci_dev *hdev, struct sk_buff *skb,
                 BTD("2 %#x\n", dlen);
 
                 if (skb_tailroom(skb) < dlen) {
+                BTF("%s lsize=2, tailroom insufficient\n", __func__);
                     kfree_skb(skb);
                     return ERR_PTR(-EMSGSIZE);
                 }
@@ -337,12 +250,14 @@ struct sk_buff *aml_h4_recv_buf(struct hci_dev *hdev, struct sk_buff *skb,
                 BTD("3 %#x\n", dlen);
 
                 if (skb_tailroom(skb) < dlen) {
+                BTF("%s lsize=3, tailroom insufficient\n", __func__);
                     kfree_skb(skb);
                     return ERR_PTR(-EMSGSIZE);
                 }
                 break;
             default:
                 /* Unsupported variable length */
+                BTF("%s unsupported lsize: %d\n", __func__, (&pkts[i])->lsize);
                 kfree_skb(skb);
                 return ERR_PTR(-EILSEQ);
             }
@@ -367,17 +282,18 @@ struct sk_buff *aml_h4_recv_buf(struct hci_dev *hdev, struct sk_buff *skb,
         }
     }
 
-	return skb;
+   return skb;
 }
 
 static int aml_coex_open(struct hci_uart *hu)
 {
-    BTD(" open hu %p\n", hu);
+    BTI(" open hu %p\n", hu);
     aml_coex = kzalloc(sizeof(struct aml_coex_struct), GFP_KERNEL);
     if (!aml_coex)
         return -ENOMEM;
 
     skb_queue_head_init(&aml_coex->txq);
+    skb_queue_head_init(&aml_coex->rxq);
 
     amlhci = hu;
     hu->priv = aml_coex;
@@ -387,19 +303,16 @@ static int aml_coex_open(struct hci_uart *hu)
 /* Close protocol */
 static int aml_coex_close(struct hci_uart *hu)
 {
+
     struct aml_coex_struct *p_aml_coex = hu->priv;
-
+    BTI("close hu %p\n", hu);
     hu->priv = NULL;
-
-    BTD("close hu %p\n", hu);
+    amlhci = NULL;
 
     skb_queue_purge(&p_aml_coex->txq);
-
+    skb_queue_purge(&p_aml_coex->rxq);
     kfree_skb(p_aml_coex->rx_skb);
-
-    hu->priv = NULL;
     kfree(p_aml_coex);
-    amlhci = NULL;
 
     return 0;
 }
@@ -491,6 +404,7 @@ static int aml_coex_flush(struct hci_uart *hu)
     BTD(" flush hu %p", hu);
 
     skb_queue_purge(&p_aml_coex->txq);
+    skb_queue_purge(&p_aml_coex->rxq);
 
     return 0;
 }

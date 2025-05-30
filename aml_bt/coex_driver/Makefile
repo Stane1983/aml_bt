@@ -4,13 +4,17 @@ M ?= $(PWD)
 
 AMLBT_MOD_NAME = w2l_bt
 
-AMLBT_CFILES := hci_aml.c hci_aml_thread.c hci_aml_zigbee.c
+AMLBT_CFILES := hci_aml.c hci_aml_thread.c hci_aml_zigbee.c hci_aml_btlog.c
 
 $(AMLBT_MOD_NAME)-objs := $(AMLBT_CFILES:.c=.o)
 
 obj-m := $(AMLBT_MOD_NAME).o
 
 EXTRA_SYMBOLS_PATH_USB_BT=$(KERNEL_SRC)/Module.symvers
+
+EXTRA_SYMBOLS_PATH_USB_BT := $(shell dirname $(KERNEL_SRC))/aml-wifi-r-amlogic/w2l/aml_drv/Module.symvers
+
+KBUILD_EXTRA_SYMBOLS := $(EXTRA_SYMBOLS_PATH_USB_BT)
 
 ccflags-y += -I$(KERNEL_SRC)/drivers/bluetooth
 

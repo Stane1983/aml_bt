@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-*  Copyright (C) 2025 Amlogic Corporation
+*  Copyright (C) 2019-2025 Amlogic Corporation
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -19,11 +19,9 @@
 #ifndef __AML_ZIGBEE_H__
 #define __AML_ZIGBEE_H__
 
-//#define AML_CHAR_ZIGBEE_DEVICE_NAME "aml_zigbee"
 #define AML_CHAR_ZIGBEE_DEVICE_NAME "aml_zigbee"
 
 #define ZIGBEE_MAX_FRAME_SIZE 1024
-#define ZIGBEE_FIFO_SIZE      4*1024
 
 int aml_zigbee_init(void);
 int aml_zigbee_deinit(void);

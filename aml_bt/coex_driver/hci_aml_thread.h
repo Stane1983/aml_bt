@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-*  Copyright (C) 2025 Amlogic Corporation
+*  Copyright (C) 2019-2025 Amlogic Corporation
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@
 
 #define AML_CHAR_THREAD_DEVICE_NAME "aml_thread"
 #define THREAD_MAX_FRAME_SIZE 1024
-#define THREAD_FIFO_SIZE      4*1024
 
 int aml_thread_init(void);
 int aml_thread_deinit(void);
