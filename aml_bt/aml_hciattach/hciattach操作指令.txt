@@ -1,0 +1,14 @@
+aml_hciattach -s 115200 /dev/ttyS1 aml   //原生串口下载指令
+aml_hciattach -u 0 /dev/aml_btusb          //代码合并后下载指令
+
+makefile文件修改，添加编译入参PROJECT，默认是linux_public
+如果携带入参make PROJECT=roku则表示ROKU_PROJECT打开
+
+#ifdef ROKU_PROJECT
+// roku项目相关代码
+#endif
+
+#ifdef LINUX_PUBLIC
+// linux_public项目相关代码
+#endif
+

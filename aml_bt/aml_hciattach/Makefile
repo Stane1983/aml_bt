@@ -1,22 +1,56 @@
-CFLAGS := -Wall -g
-CROSS_COMPILE=$(TARGET_KERNEL_CROSS)
-CC ?= $(CROSS_COMPILE)gcc
-all: aml_hciattach
-#OBJS := hciattach.o hciattach_aml.o
-OBJS := hciattach.o
+# Cross compiler
+CROSS_COMPILE := $(TARGET_KERNEL_CROSS)
+CC            ?= $(CROSS_COMPILE)gcc
 
-aml_hciattach: $(OBJS)
-	$(CC) -o aml_hciattach $(OBJS)
+# Compiler flags
+CFLAGS        := -Wall -g -O2 -Wno-unused-function -Wunused-result -Wno-unused-variable
 
+LDFLAGS := -pthread
+
+PROJECT ?= linux_public
+
+ifeq ($(PROJECT),roku)
+    CFLAGS += -DROKU_PROJECT
+else ifeq ($(PROJECT),audio)
+    CFLAGS += -DAUDIO_PROJECT
+else ifeq ($(PROJECT),linux_public)
+    CFLAGS += -DLINUX_PUBLIC
+endif
+
+# Sources and objects
+SRCS := aml_multibt.c hciattach.c hciattach_aml.c hciattach_aml_usb.c \
+        aml_conf.c
+
+OBJS := $(SRCS:.c=.o)
+
+# Output binary
+TARGET := aml_hciattach
+
+# Default target
+all: $(TARGET)
+
+# Link rule
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# Compile rule
 %.o: %.c
-	$(CC) -c $< -o $@ $(CFLAGS)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
+# Clean
 clean:
-	rm -f $(OBJS)  aml_hciattach
+	rm -f $(OBJS) $(TARGET) cscope.files cscope.out tags
 
+# Tags
 tags: FORCE
-	ctags -R
-	find ./ -name "*.h" -o -name "*.c" -o -name "*.cc" -o -name "*.cpp" > cscope.files
+	@echo "Generating ctags..."
+	ctags -R .
+	@echo "Generating cscope.files..."
+	find ./ -name "*.c" -o -name "*.cc" -o -name "*.cpp" -o -name "*.h" > cscope.files
+	@echo "Generating cscope.out..."
 	cscope -bkq -i cscope.files
-PHONY += FORCE
+	@echo "Done."
+
 FORCE:
+
+.PHONY: all clean tags FORCE
