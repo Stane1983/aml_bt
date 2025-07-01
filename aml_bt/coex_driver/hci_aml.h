@@ -83,7 +83,10 @@ struct _gdsl_fifo_t
 struct aml_coex_struct {
 	struct sk_buff *rx_skb;
 	struct sk_buff_head txq;
+	struct mutex txq_mutex;
 	struct sk_buff_head rxq;      // 接收队列
+	struct sk_buff_head thread_rxq;
+        struct sk_buff_head zigbee_rxq;
 };
 
 #if 0

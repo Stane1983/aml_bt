@@ -59,6 +59,7 @@ static struct semaphore read_rx_sem;
 
 static int evt_state = 0;
 static DECLARE_WAIT_QUEUE_HEAD(poll_amlth_queue);
+static DECLARE_WAIT_QUEUE_HEAD(poll_thread_queue);
 static struct mutex fw_thread_fifo_mutex;
 static int fw_data_flag = 0;
 
@@ -87,18 +88,18 @@ static unsigned int threadchr_poll(struct file *file, poll_table *wait)
 {
     int mask = 0;
 
-    BTD("%s: [before check] rxq.len=%d, evt_state=%d\n",
-        __func__, skb_queue_len(&amlth->rxq), evt_state);
-    poll_wait(file, &poll_amlth_queue, wait);
+    //BTD("%s: [before check] rxq.len=%d, evt_state=%d\n",
+    //    __func__, skb_queue_len(&amlth->thread_rxq), evt_state);
+    poll_wait(file, &poll_thread_queue, wait);
 
-    if (!skb_queue_empty(&amlth->rxq) || evt_state)
+    if (!skb_queue_empty(&amlth->thread_rxq) || evt_state)
     {
         mask = POLLIN | POLLRDNORM;
     }
 
    // mask = POLLIN | POLLRDNORM;
-   BTD("%s: rxq.len=%d, mask=0x%x, evt_state=%d\n",
-       __func__, skb_queue_len(&amlth->rxq), mask, evt_state);
+   //BTD("%s: rxq.len=%d, mask=0x%x, evt_state=%d\n",
+   //    __func__, skb_queue_len(&amlth->thread_rxq), mask, evt_state);
     return mask;
 
 }
@@ -143,7 +144,6 @@ static ssize_t aml_thread_char_read(struct file *file_p,
     static unsigned char host_read_buff[1024] = {0};
     unsigned int read_len = 0;
     struct sk_buff *skb = NULL;
-    unsigned int i = 0;
     BTD("%s:(%d, %ld)\n", __func__, evt_state, count);
     if (!amlhci || !amlhci->priv)
     {
@@ -156,13 +156,13 @@ static ssize_t aml_thread_char_read(struct file *file_p,
             evt_state = 1;
             memset(host_read_buff, 0, sizeof(host_read_buff));
 
-            BTD("rxq len: %d\n", skb_queue_len(&amlth->rxq));
-            if (!skb_queue_empty(&amlth->rxq))
+            BTD("rxq len: %d\n", skb_queue_len(&amlth->thread_rxq));
+            if (!skb_queue_empty(&amlth->thread_rxq))
             {
               BTD(KERN_CONT "\n");
             }
             mutex_lock(&fw_thread_fifo_mutex);
-            skb = skb_dequeue(&amlth->rxq);
+            skb = skb_dequeue(&amlth->thread_rxq);
             mutex_unlock(&fw_thread_fifo_mutex);
             if (!skb) {
                 BTE("%s: No skb in rxq\n", __func__);
@@ -171,11 +171,6 @@ static ssize_t aml_thread_char_read(struct file *file_p,
             read_len = skb->len;
             memcpy(host_read_buff, skb->data, read_len);
             kfree_skb(skb);
-            BTD("host_read_buff data: ");
-            for (; i < read_len; i++)
-            {
-            BTD("0x%02x ", host_read_buff[i]);
-            }
             BTD("tp(%#x)\n", host_read_buff[0]);
             if (copy_to_user(buf_p, &host_read_buff[0], count)) {
                 BTE("%s, copy_to_user error\n", __func__);
@@ -268,7 +263,9 @@ static ssize_t aml_thread_char_write(struct file *file_p,
     skb_push(skb, 1);
     skb->data[0] = hci_skb_pkt_type(skb);
     BTD("%s: Prepended skb, first byte = %#x\n", __func__, skb->data[0]);
+    mutex_lock(&amlth->txq_mutex);
     skb_queue_tail(&amlth->txq, skb);
+    mutex_unlock(&amlth->txq_mutex);
     BTD("%s: Queued skb to txq, skb->len = %d\n",__func__, skb->len);
     hci_uart_tx_wakeup(amlhci);
 
@@ -289,10 +286,10 @@ int aml_thread_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
     }
     skb->data[0] = hci_skb_pkt_type(skb);
     mutex_lock(&fw_thread_fifo_mutex);
-    skb_queue_tail(&amlth->rxq, skb);
-    BTD("thread_recv_frame: skb enqueued, rxq.len = %d\n", skb_queue_len(&amlth->rxq));
+    skb_queue_tail(&amlth->thread_rxq, skb);
+    BTD("thread_recv_frame: skb enqueued, rxq.len = %d\n", skb_queue_len(&amlth->thread_rxq));
     mutex_unlock(&fw_thread_fifo_mutex);
-    wake_up_interruptible(&poll_amlth_queue);
+    wake_up_interruptible(&poll_thread_queue);
     return 0;
 
 }

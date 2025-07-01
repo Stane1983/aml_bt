@@ -26,6 +26,7 @@
 #include <linux/interrupt.h>
 #include <linux/ptrace.h>
 #include <linux/poll.h>
+#include <linux/version.h>
 
 #include <linux/slab.h>
 #include <linux/tty.h>
@@ -49,7 +50,7 @@
 #include "hci_aml_thread.h"
 #include "hci_aml_zigbee.h"
 
-#define AML_COEX_VERSION    "2025-0526,15:00"
+#define AML_COEX_VERSION    "2025-0721,1430 LEA"
 
 struct aml_coex_struct *aml_coex;
 struct hci_uart *amlhci;
@@ -117,6 +118,9 @@ static const struct h4_recv_pkt aml_coex_recv_pkts[] = {
     { H4_RECV_ACL,   .recv = hci_recv_frame },
     { H4_RECV_SCO,   .recv = hci_recv_frame },
     { H4_RECV_EVENT, .recv = hci_recv_frame },
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0)
+    { H4_RECV_ISO,    .recv = hci_recv_frame },
+#endif
     { H4_RECV_15P4,  .recv = aml_coex_recv_frame },
 };
 
@@ -293,7 +297,10 @@ static int aml_coex_open(struct hci_uart *hu)
         return -ENOMEM;
 
     skb_queue_head_init(&aml_coex->txq);
+    mutex_init(&aml_coex->txq_mutex);
     skb_queue_head_init(&aml_coex->rxq);
+    skb_queue_head_init(&aml_coex->thread_rxq);
+    skb_queue_head_init(&aml_coex->zigbee_rxq);
 
     amlhci = hu;
     hu->priv = aml_coex;
@@ -306,23 +313,43 @@ static int aml_coex_close(struct hci_uart *hu)
 
     struct aml_coex_struct *p_aml_coex = hu->priv;
     BTI("close hu %p\n", hu);
-    hu->priv = NULL;
-    amlhci = NULL;
+
+    if (!p_aml_coex) {
+      BTE("aml_coex already freed!\n");
+      return 0;
+    }
 
     skb_queue_purge(&p_aml_coex->txq);
     skb_queue_purge(&p_aml_coex->rxq);
-    kfree_skb(p_aml_coex->rx_skb);
+    skb_queue_purge(&p_aml_coex->thread_rxq);
+    skb_queue_purge(&p_aml_coex->zigbee_rxq);
+    mutex_destroy(&p_aml_coex->txq_mutex);
+
+    if (p_aml_coex->rx_skb && !IS_ERR(p_aml_coex->rx_skb)) {
+      kfree_skb(p_aml_coex->rx_skb);
+    }
+
+    hu->priv = NULL;
     kfree(p_aml_coex);
 
+    amlhci = NULL;
+
     return 0;
+
 }
 
 /* Recv data */
 static int aml_coex_recv(struct hci_uart *hu, const void *data, int count)
 {
     struct aml_coex_struct *p_aml_coex = hu->priv;
-    BTD("aml_coex_recv  %p count %d\n", p_aml_coex, count);
 
+    BTD("aml_coex_recv: hu=%p, hu->hdev=%p\n", hu, hu ? hu->hdev : NULL);
+    if (!hu->hdev)
+    {
+      BTE("aml_coex_recv: hu->hdev is NULL, device not ready!\n");
+      return -ENODEV;
+    }
+    BTD("aml_coex_recv  %p count %d\n", p_aml_coex, count);
     if (p_aml_coex == NULL)
     {
         BTE("p_aml_coex NULL!\n");
@@ -382,7 +409,9 @@ static int aml_coex_enqueue(struct hci_uart *hu, struct sk_buff *skb)
 
     /* Prepend skb with frame type */
     memcpy(skb_push(skb, 1), &hci_skb_pkt_type(skb), 1);
+    mutex_lock(&p_aml_coex->txq_mutex);
     skb_queue_tail(&p_aml_coex->txq, skb);
+    mutex_unlock(&p_aml_coex->txq_mutex);
 
     return 0;
 }
@@ -391,9 +420,14 @@ static struct sk_buff *aml_coex_dequeue(struct hci_uart *hu)
 {
     struct aml_coex_struct *p_aml_coex = (struct aml_coex_struct *)hu->priv;
 
-    BTD("aml_coex_dequeue hu %p\n", hu);
+    struct sk_buff *skb;
 
-    return skb_dequeue(&p_aml_coex->txq);
+    mutex_lock(&p_aml_coex->txq_mutex);
+    skb = skb_dequeue(&p_aml_coex->txq);
+    mutex_unlock(&p_aml_coex->txq_mutex);
+
+    return skb;
+
 }
 
 /* Flush protocol data */
@@ -403,8 +437,12 @@ static int aml_coex_flush(struct hci_uart *hu)
 
     BTD(" flush hu %p", hu);
 
+    mutex_lock(&p_aml_coex->txq_mutex);
     skb_queue_purge(&p_aml_coex->txq);
+    mutex_unlock(&p_aml_coex->txq_mutex);
     skb_queue_purge(&p_aml_coex->rxq);
+    skb_queue_purge(&p_aml_coex->thread_rxq);
+    skb_queue_purge(&p_aml_coex->zigbee_rxq);
 
     return 0;
 }

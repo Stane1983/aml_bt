@@ -58,6 +58,8 @@ static struct semaphore read_rx_sem;
 
 static int evt_state = 0;
 static DECLARE_WAIT_QUEUE_HEAD(poll_amlth_queue);
+static DECLARE_WAIT_QUEUE_HEAD(poll_zigbee_queue);
+
 static struct mutex fw_zigbee_fifo_mutex;
 static int fw_data_flag = 0;
 
@@ -84,16 +86,16 @@ static void aml_zigbee_buff_deinit(void)
 static unsigned int aml_zigbee_poll(struct file *file, poll_table *wait)
 {
     int mask = 0;
-    BTD("%s: [before check] rxq.len=%d, evt_state=%d\n",
-        __func__, skb_queue_len(&amlth->rxq), evt_state);
-    poll_wait(file, &poll_amlth_queue, wait);
+    //BTD("%s: [before check] rxq.len=%d, evt_state=%d\n",
+    //   __func__, skb_queue_len(&amlth->zigbee_rxq), evt_state);
+    poll_wait(file, &poll_zigbee_queue, wait);
 
-    if (!skb_queue_empty(&amlth->rxq) || evt_state)
+    if (!skb_queue_empty(&amlth->zigbee_rxq) || evt_state)
     {
         mask = POLLIN | POLLRDNORM;
     }
-    BTD("%s: rxq.len=%d, mask=0x%x, evt_state=%d\n",
-        __func__, skb_queue_len(&amlth->rxq), mask, evt_state);
+     //BTD("%s: rxq.len=%d, mask=0x%x, evt_state=%d\n",
+     //  __func__, skb_queue_len(&amlth->zigbee_rxq), mask, evt_state);
     return mask;
 
 }
@@ -119,8 +121,8 @@ static int aml_zigbee_char_open(struct inode *inode, struct file *file)
     BTI("%s\n", __func__);
     amlhci = aml_coex_hci_get();
     amlth = aml_coex_struct_get();
-    return nonseekable_open(inode, file);
     aml_zigbee_buff_init();
+    return nonseekable_open(inode, file);
 }
 static int aml_zigbee_char_close(struct inode *inode, struct file *file)
 {
@@ -137,7 +139,6 @@ static ssize_t aml_zigbee_char_read(struct file *file_p,
     static unsigned char host_read_buff[1024] = {0};
     unsigned int read_len = 0;
     struct sk_buff *skb = NULL;
-    unsigned int i = 0;
     BTD("%s:(%d, %ld)\n", __func__, evt_state, count);
     if (!amlhci || !amlhci->priv)
     {
@@ -151,13 +152,13 @@ static ssize_t aml_zigbee_char_read(struct file *file_p,
             evt_state = 1;
             memset(host_read_buff, 0, sizeof(host_read_buff));
 
-            BTD("rxq len: %d\n", skb_queue_len(&amlth->rxq));
-            if (!skb_queue_empty(&amlth->rxq))
+            BTD("rxq len: %d\n", skb_queue_len(&amlth->zigbee_rxq));
+            if (!skb_queue_empty(&amlth->zigbee_rxq))
             {
                 BTD(KERN_CONT "\n");
             }
             mutex_lock(&fw_zigbee_fifo_mutex);
-            skb = skb_dequeue(&amlth->rxq);
+            skb = skb_dequeue(&amlth->zigbee_rxq);
             mutex_unlock(&fw_zigbee_fifo_mutex);
             if (!skb) {
                 BTE("%s: No skb in rxq\n", __func__);
@@ -166,10 +167,6 @@ static ssize_t aml_zigbee_char_read(struct file *file_p,
             read_len = skb->len;
             memcpy(host_read_buff, skb->data, read_len);
             kfree_skb(skb);
-            BTD("host_read_buff data: ");
-            for (; i < read_len; i++) {
-            BTD("0x%02x ", host_read_buff[i]);
-            }
             BTD("tp(%#x)\n", host_read_buff[0]);
             if (copy_to_user(buf_p, &host_read_buff[0], count)) {
                 BTE("%s, copy_to_user error\n", __func__);
@@ -179,7 +176,7 @@ static ssize_t aml_zigbee_char_read(struct file *file_p,
 
         case 1:  // 读取头
             evt_state = 2;
-            BTD("thread header:%#x|%#x|%#x|%#x|\n", host_read_buff[1],
+            BTD("zigbee header:%#x|%#x|%#x|%#x|\n", host_read_buff[1],
                 host_read_buff[2], host_read_buff[3], host_read_buff[4]);
 
             if (copy_to_user(buf_p, &host_read_buff[1], count)) {
@@ -190,8 +187,8 @@ static ssize_t aml_zigbee_char_read(struct file *file_p,
 
         case 2:  // 读取有效载荷
             read_len = 7 + ((host_read_buff[4] << 8) | (host_read_buff[3]));
-            BTD("thread read len %d\n", read_len);
-            BTD("thread payload:[%#x|%#x|%#x|%#x|%#x|%#x|%#x|%#x]\n",
+            BTD("zigbee read len %d\n", read_len);
+            BTD("zigbee payload:[%#x|%#x|%#x|%#x|%#x|%#x|%#x|%#x]\n",
                 host_read_buff[5], host_read_buff[6], host_read_buff[7], host_read_buff[8],
                 host_read_buff[9], host_read_buff[10], host_read_buff[11], host_read_buff[12]);
 
@@ -261,7 +258,9 @@ static ssize_t aml_zigbee_char_write(struct file *file_p,
     skb_push(skb, 1);
     skb->data[0] = hci_skb_pkt_type(skb);
     BTD("%s: Prepended skb, first byte = %#x\n", __func__, skb->data[0]);
+    mutex_lock(&amlth->txq_mutex);
     skb_queue_tail(&amlth->txq, skb);
+    mutex_unlock(&amlth->txq_mutex);
     BTD("%s: Queued skb to txq, skb->len = %d\n",__func__, skb->len);
     hci_uart_tx_wakeup(amlhci);
 
@@ -282,10 +281,10 @@ int aml_zigbee_recv_frame(struct hci_dev *hdev, struct sk_buff *skb)
     }
     skb->data[0] = hci_skb_pkt_type(skb);
     mutex_lock(&fw_zigbee_fifo_mutex);
-    skb_queue_tail(&amlth->rxq, skb);
-    BTD("thread_recv_frame: skb enqueued, rxq.len = %d\n", skb_queue_len(&amlth->rxq));
+    skb_queue_tail(&amlth->zigbee_rxq, skb);
+    BTD("zigbee_recv_frame: skb enqueued, rxq.len = %d\n", skb_queue_len(&amlth->zigbee_rxq));
     mutex_unlock(&fw_zigbee_fifo_mutex);
-    wake_up_interruptible(&poll_amlth_queue);
+    wake_up_interruptible(&poll_zigbee_queue);
     return 0;
 
 }
