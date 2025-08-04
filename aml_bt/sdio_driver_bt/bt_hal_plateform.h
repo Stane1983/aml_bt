@@ -28,7 +28,7 @@
 #include <linux/timer.h>
 #include <linux/string.h>
 
-extern int w1_sdio_driver_insmoded;
+extern unsigned char w1_sdio_driver_insmoded;
 extern unsigned char w1_sdio_after_porbe;
 extern struct amlw1_hif_ops g_w1_hif_ops;
 extern void amlwifi_set_sdio_host_clk(int clk);
