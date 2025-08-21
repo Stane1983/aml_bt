@@ -184,14 +184,6 @@ typedef enum {
     USERIAL_OP_NOP,
 } userial_vendor_ioctl_op_t;
 
-typedef struct {
-    int mod_type;
-    unsigned short iccm_base;
-    char *mod_type_name;
-    char *name;
-    char *fw_file;
-} vnd_module_t;
-
 void set_dbg_flag(int val);
 char* get_bt_name(void);
 bool distinguish_bt_module(void);

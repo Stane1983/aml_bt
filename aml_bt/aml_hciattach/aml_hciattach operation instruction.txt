@@ -1,0 +1,12 @@
+aml_hciattach -s 115200 /dev/ttyS1 aml   // Original UART BT download command
+aml_hciattach -u 0 /dev/aml_btusb        // Original USB BT download command
+
+Currently supported loading instructions after merging:
+aml_hciattach -d 1  // -d 1 enable aml_hciattach debug log
+
+Currently default use LINUX-PUBLIC macro configuration defined in aml_comm.h.
+Yocto STB/TV: default use LINUX_PUBLIC
+ROKU system: add compilation instructions
+-DROKU_PROJECT
+buildroot/yocto audio: add compilation instructions
+-DAUDIO_PROJECT

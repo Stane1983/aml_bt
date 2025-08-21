@@ -5,24 +5,13 @@ CROSS_COMPILE := $(TARGET_KERNEL_CROSS)
 CC            ?= $(CROSS_COMPILE)gcc
 
 # Compiler flags
-CFLAGS        := -Wall -g -O2 -Wno-unused-function -Wunused-result -Wno-unused-variable
+CFLAGS        += -Wall -g -O2 -Wno-unused-function -Wunused-result -Wno-unused-variable
 
 LDFLAGS := -pthread
 LDFLAGS += -L $(OUT_DIR)/
 
-
-PROJECT ?= linux_public
-
-ifeq ($(PROJECT),roku)
-    CFLAGS += -DROKU_PROJECT
-else ifeq ($(PROJECT),audio)
-    CFLAGS += -DAUDIO_PROJECT
-else ifeq ($(PROJECT),linux_public)
-    CFLAGS += -DLINUX_PUBLIC
-endif
-
 # Sources and objects
-SRCS := aml_multibt.c hciattach.c hciattach_aml.c hciattach_aml_usb.c \
+SRCS := aml_multibt.c hciattach.c hciattach_aml.c hciattach_aml_usb.c aml_comm.c \
         aml_conf.c
 
 OBJS := $(SRCS:.c=.o)

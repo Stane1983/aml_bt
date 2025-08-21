@@ -21,9 +21,16 @@
  *
  */
 
+#ifndef HCIATTACH_H
+#define HCIATTACH_H
+
 #include <termios.h>
 #include <stdint.h>
 #include <syslog.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef N_HCI
 #define N_HCI    15
@@ -65,3 +72,8 @@ int set_speed(int fd, struct termios *ti, int speed);
 int uart_speed(int speed);
 int aml_init(int fd, char *bdaddr);
 
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* HCIATTACH_H */

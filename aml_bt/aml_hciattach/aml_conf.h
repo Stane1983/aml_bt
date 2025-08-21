@@ -19,6 +19,10 @@
 #ifndef AML_CONF_H
 #define AML_CONF_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define HCI_MAX_CMD_SIZE       260
 #define HCI_MAX_EVENT_SIZE     260
 /* HCI Packet types */
@@ -50,8 +54,25 @@
 #define LOCAL_BDADDR_PATH_BUFFER_LEN 256
 #define BIT(_n)                 (1 << (_n))
 
-void amlbt_load_conf();
-void vnd_load_conf(const char *p_path);
+//get aml_bt.conf param
+extern unsigned int amlbt_rftype;
+extern unsigned int amlbt_btsink;
+extern unsigned int amlbt_fw_mode;
+extern unsigned int amlbt_pin_mux;
+extern unsigned int amlbt_br_digit_gain;
+extern unsigned int amlbt_edr_digit_gain;
+extern unsigned int amlbt_fwlog_config;
+extern unsigned char APCF_config_manf_data[256];
+extern unsigned int amlbt_manf_cnt;
+extern unsigned int amlbt_factory;
+extern unsigned int amlbt_system;
+extern unsigned int amlbt_manf_para;
+extern unsigned char w1u_manf_data[MANF_ROW][MANF_COLUMN];
 
+void amlbt_load_conf();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* AML_CONF_H */

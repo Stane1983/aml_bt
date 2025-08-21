@@ -38,11 +38,24 @@
 #include <pthread.h>
 
 // Project-specific headers
+#include "aml_comm.h"
 #include "aml_multibt.h"
 
 /******************************************************************************
 **  Constants & Macros
 ******************************************************************************/
+#ifndef __NR_delete_module
+    #if defined(__x86_64__)
+        #define __NR_delete_module 176
+    #elif defined(__i386__)
+        #define __NR_delete_module 129
+    #elif defined(__aarch64__)
+        #define __NR_delete_module 176
+    #else
+        #error "Need __NR_delete_module for this arch"
+    #endif
+#endif
+
 #ifdef MAILBOX_MOD_NAME
 #define MBOX_USER_MAX_LEN   96
 #define PATH_MAX_LEN        64
@@ -61,7 +74,14 @@
 #define RFKILL_PATH "/sys/class/rfkill"
 #define WIFI_POWER_DEV "/dev/wifi_power"
 
-#define KERNEL_DRV_PATH "/lib/modules/*/kernel/drivers/amlogic/bt"
+#ifdef AUDIO_PROJECT
+#define WIFI_DRV_PATH "/lib/modules/*/kernel/amlogic/wifi"
+#define BT_DRV_PATH "/lib/modules/*/kernel/amlogic/bt"
+#else
+#define WIFI_DRV_PATH "/lib/modules/*/kernel/drivers/amlogic/wifi"
+#define BT_DRV_PATH "/lib/modules/*/kernel/drivers/amlogic/bt"
+#endif
+
 #define AMLBT_IF_TYPE "amlbt_if_type="
 
 #define POWER_EVENT_DEF '0'
@@ -144,13 +164,14 @@ static const steps_table steps_table_exp[] = {
 #ifdef MAILBOX_MOD_NAME
     {op_mailbox_mod_name,       mailbox_mod_name_thread},
 #endif
-    {op_amlbt_drv_insmod,       (void *)amlbt_drv_modprobe},
+    {op_amlbt_drv_insmod,       (void *)amlbt_drv_insmod},
 };
+
+static bool dbg_flag = false;
 
 static uart_cb bt_uart_cb;
 static char *rfkill_state_path = NULL;
 static bool pci_flag = false;
-static bool dbg_flag = false;
 static char amlbt_name[MOD_NAME_MAX_LEN + 1] = {0};
 
 /******************************************************************************
@@ -218,14 +239,20 @@ static const dev_info_uart bt_dev_uart[] = {
 };
 
 static const drv_info aml_drv[] = {
-    {"aml_w1",        {{"sdio_bt",    ""},                  {"",   ""}}},
-    {"aml_w1u",       {{"w1u_bt",     AMLBT_IF_TYPE "1280"},{"",   ""}}},
-    {"aml_w1u_s",     {{"w1u_bt",     AMLBT_IF_TYPE "1280"},{"",   ""}}},
-    {"aml_w2_s",      {{"w2_bt",      AMLBT_IF_TYPE "1536"},{"",   ""}}},
-    {"aml_w2_p",      {{"w2_bt",      AMLBT_IF_TYPE "1538"},{"",   ""}}},
-    {"aml_w2_u",      {{"w2_bt",      AMLBT_IF_TYPE "1537"},{"",   ""}}},
-    {"aml_w2l_s",     {{"w2l_bt",     AMLBT_IF_TYPE "2048"},{"",   ""}}},
-    {"aml_w2l_u",     {{"w2l_bt",     AMLBT_IF_TYPE "2049"},{"",   ""}}},
+    {"aml_w1",      {{"aml_sdio",   ""},              {"sdio_bt",    ""}}},
+    {"aml_w1u",     {{"w1u_comm",   "bus_type=usb"},  {"w1u_bt",     AMLBT_IF_TYPE"1281"}}},
+    {"aml_w1u_s",   {{"w1u_comm",   "bus_type=sdio"}, {"w1u_bt",     AMLBT_IF_TYPE"1280"}}},
+    {"aml_w2_s",    {{"w2_comm",    "bus_type=sdio"}, {"w2_bt",      AMLBT_IF_TYPE"1536"}}},
+    {"aml_w2_p",    {{"w2_comm",    "bus_type=pci"},  {"w2_bt",      AMLBT_IF_TYPE"1538"}}},
+    {"aml_w2_u",    {{"w2_comm",    "bus_type=usb"},  {"w2_bt",      AMLBT_IF_TYPE"1537"}}},
+#ifdef AUDIO_PROJECT
+     // compile coex_driver generate w2l_bt.ko,support bt/zibgee/thread
+    {"aml_w2l_s",   {{"w2l_comm",   "bus_type=sdio"}, {"w2l_bt",     ""}}},
+    {"aml_w2l_u",   {{"w2l_comm",   "bus_type=usb"},  {"w2l_bt",     AMLBT_IF_TYPE"2049"}}},
+#else
+    {"aml_w2l_s",   {{"w2l_comm",   "bus_type=sdio"}, {"w2l_bt",     AMLBT_IF_TYPE"2048"}}},
+    {"aml_w2l_u",   {{"w2l_comm",   "bus_type=usb"},  {"w2l_bt",     AMLBT_IF_TYPE"2049"}}},
+ #endif
 };
 
 void set_dbg_flag(int val)
@@ -234,8 +261,9 @@ void set_dbg_flag(int val)
         dbg_flag = true;
     } else {
         dbg_flag = false;
-        ALOGI("dbg_flag: %s", dbg_flag ? "true" : "false");
     }
+
+    ALOGI("dbg_flag: %s", dbg_flag ? "true" : "false");
 }
 
 bool get_dbg_flag(void)
@@ -252,24 +280,24 @@ static void* mailbox_mod_name(void *arg)
         int cmd;
         char msg[MBOX_USER_MAX_LEN];
     } merge_data;
-    int fd = -1;
-    int ret = -1;
-    unsigned int len = 0;
+    int fd = -1, ret = -1;
     char path[PATH_MAX_LEN] = {'\0'};
-    char bt_name[MOD_NAME_MAX_LEN] = {'\0'};
+    char bt_name[MOD_NAME_MAX_LEN + 1] = {'\0'};
+    unsigned int len = 0;
 
-    sprintf(path, "%s", ARMV8_TO_AOCPU);
-    ALOGI("open %s", path);
+    strncpy(path, ARMV8_TO_AOCPU, sizeof(path) - 1);
+    path[sizeof(path)-1] = '\0';
+    ALOGD("open %s", path);
 
     fd = open(path, O_RDWR);
     if (fd < 0) {
-        ALOGE("open %s failed: %s (%d)", ARMV8_TO_AOCPU, strerror(errno), errno);
+        ALOGE("open %s failed: %s (%d)", path, strerror(errno), errno);
         goto exit;
     }
 
     merge_data.cmd = CMD_SET_MID;
     len += sizeof(merge_data.cmd);
-    strcpy(merge_data.msg, amlbt_name);
+    strncpy(merge_data.msg, amlbt_name, MBOX_USER_MAX_LEN - 1);
     len += strlen(amlbt_name);
     ret = write(fd, &merge_data, len);
     if (ret < 0) {
@@ -282,13 +310,13 @@ static void* mailbox_mod_name(void *arg)
         ALOGE("read failed: %s (%d)", strerror(errno), errno);
         goto exit;
     }
+    bt_name[ret] = '\0';
 
-    ALOGI("write len:%u,buf:%s", len, bt_name);
+    ALOGI("write ret:%d, buf:%s", ret, bt_name);
 
 exit:
-    if (fd >= 0) {
+    if (fd >= 0)
         close(fd);
-    }
 
     return NULL;
 }
@@ -391,7 +419,7 @@ static int matching_dev_name(const dev_info *dev, unsigned int dev_size, const c
 
     for (cnt = 0; cnt < dev_size; cnt++) {
         if (!strcmp(dev[cnt].dev_name, val)) {
-            ALOGI("matched dev_name:%s, cnt:%d", dev[cnt].dev_name, cnt);
+            ALOGD("matched dev_name:%s, cnt:%d", dev[cnt].dev_name, cnt);
             ret = cnt;
             break;
         }
@@ -515,12 +543,12 @@ static void set_power_type(void)
     char power_type = '\0';
 
     if (!get_power_type(&power_type)) {
-        ALOGI("get power type failed");
+        ALOGE("get power type failed");
         return;
     }
 
     if (!write_power_type(&power_type, sizeof(char))) {
-        ALOGI("write power type failed");
+        ALOGE("write power type failed");
         return;
     }
 
@@ -1575,43 +1603,41 @@ static int insmod(const char *filename, const char *args)
 
     ret = syscall(__NR_finit_module, fd, args, 0);
     if (ret != 0) {
-        ALOGE("finit_module");
+        if (errno == EEXIST) {
+            ALOGD("module already loaded: %s", filename);
+            ret = 0;
+        } else {
+            ALOGE("finit_module failed: %s", strerror(errno));
+        }
     } else {
         ALOGD("insmod ok: %s %s", filename, args ? args : "");
+        usleep(100000);
     }
 
     close(fd);
 
-    usleep(200000);
-
     return ret;
 }
 
-static int rmmod(const char *modname)
+/*
+ * name: Module name (not a path, for example, after insmod xxx.ko, pass "xxx" here)
+ * flags: Passing 0 is usually sufficient; If you want to force uninstallation of
+ * transferable O-TRUNC (i.e. KMOD-REMOVE-FORCE).
+ */
+static int rmmod(const char *name, int flags)
 {
-    int ret = -1;
-    int maxtry = 10;
+    int ret;
 
-    if (modname == NULL) {
+    if (!name) {
         ALOGE("parameters err");
-        return ret;
+        return -1;
     }
 
-    while (maxtry-- > 0) {
-        ret = delete_module(modname, O_NONBLOCK | O_EXCL);
-        if ((ret < 0) && (errno == EAGAIN)) {
-            usleep(500000);  // 500 ms
-        } else {
-            break;
-        }
-    }
-
+    ret = syscall(__NR_delete_module, name, flags);
     if (ret != 0) {
-        int saved_errno = errno;
-        ALOGE("Unable to unload driver module %s: %s",
-              modname, strerror(saved_errno));
+        ALOGE("remove module %s fail, %s\n", name, strerror(errno));
     } else {
-        ALOGD("Driver module %s unloaded successfully", modname);
+        ALOGD("remove module %s success\n", name);
     }
 
     return ret;
@@ -1619,58 +1645,58 @@ static int rmmod(const char *modname)
 
 static int amlbt_drv_insmod(void)
 {
-    int i, j;
+    size_t i, j, k;
+    int ret;
 
-    for (i = 0; i < sizeof(aml_drv)/sizeof(drv_info); i++) {
-        if (strcmp(amlbt_name, aml_drv[i].dev_name) != 0) {
+    for (i = 0; i < sizeof(aml_drv) / sizeof(drv_info); i++) {
+        if (strcmp(amlbt_name, aml_drv[i].dev_name) != 0)
             continue;
-        }
 
         ALOGD("Matched dev_name: %s", aml_drv[i].dev_name);
 
+        glob_t wifi_glob, bt_glob;
+        ret = glob(WIFI_DRV_PATH, 0, NULL, &wifi_glob);
+        if (ret != 0) {
+            ALOGE("Can't find WiFi driver path: %s", WIFI_DRV_PATH);
+            return -1;
+        }
+
+        ret = glob(BT_DRV_PATH, 0, NULL, &bt_glob);
+        if (ret != 0) {
+            ALOGE("Can't find BT driver path: %s", BT_DRV_PATH);
+            globfree(&wifi_glob);
+            return -1;
+        }
+
         for (j = 0; j < MOD_MAX_NUM; j++) {
-            if (strlen(aml_drv[i].mod[j].mod_name) == 0) {
+            if (strlen(aml_drv[i].mod[j].mod_name) == 0)
                 continue;
-            }
-
-            glob_t glob_result;
-            int ret = glob(KERNEL_DRV_PATH, 0, NULL, &glob_result);
-
-            if (ret != 0) {
-                ALOGE("path can't find");
-                return -1;
-            }
 
             int found = 0;
+            glob_t *pglob = (j == 0) ? &wifi_glob : &bt_glob;
 
-            for (size_t k = 0; k < glob_result.gl_pathc; k++) {
-                DIR *dir = opendir(glob_result.gl_pathv[k]);
-                if (!dir) continue;
+            for (k = 0; k < pglob->gl_pathc; k++) {
+                char ko_path[BUF_MAX_LEN * 2];
+                snprintf(ko_path, sizeof(ko_path), "%s/%s.ko",
+                         pglob->gl_pathv[k],
+                         aml_drv[i].mod[j].mod_name);
 
-                struct dirent *entry;
-                while ((entry = readdir(dir)) != NULL) {
-                    if (strcmp(entry->d_name, aml_drv[i].mod[j].mod_name) == 0) {
-                        char ko_path[BUF_MAX_LEN*2];
-                        snprintf(ko_path, sizeof(ko_path), "%s/%s.ko",
-                                 glob_result.gl_pathv[k], entry->d_name);
-                        ALOGD("find drv: %s", ko_path);
-                        insmod(ko_path, aml_drv[i].mod[j].mod_arg);
-                        found = 1;
-                        break;
-                    }
+                if (access(ko_path, F_OK) == 0) {
+                    ALOGD("Found drv: %s", ko_path);
+                    insmod(ko_path, aml_drv[i].mod[j].mod_arg);
+                    found = 1;
+                    break;
                 }
-                closedir(dir);
-
-                if (found) break;
             }
-
-            globfree(&glob_result);
 
             if (!found) {
-                printf("can't find: %s", aml_drv[i].mod[j].mod_name);
-                return -1;
+                ALOGE("Can't find module: %s, skip to next", aml_drv[i].mod[j].mod_name);
             }
         }
+
+        globfree(&wifi_glob);
+        globfree(&bt_glob);
+        break;
     }
 
     return 0;

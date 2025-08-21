@@ -23,6 +23,8 @@
  *
  */
 
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <getopt.h>
 #include <errno.h>
@@ -40,6 +42,7 @@
 #include <time.h>
 
 #include "hciattach.h"
+#include "aml_comm.h"
 #include "hciattach_aml_usb.h"
 #include "aml_multibt.h"
 #include "aml_conf.h"
@@ -58,23 +61,6 @@ unsigned char *BT_fwICCM = NULL;
 unsigned char *BT_fwDCCM = NULL;
 unsigned int ICCM_LEN = 0;
 unsigned int DCCM_LEN = 0;
-
-/* aml bt module */
-#define W1U_USB    0x01
-#define W2_USB     0x02
-#define W2L_USB    0x03
-
-static int AML_MODULE = 0;
-
-extern unsigned int  amlbt_manf_para;
-extern unsigned char w1u_manf_data[MANF_ROW][MANF_COLUMN];
-
-static const vnd_module_t aml_module[] ={
-    {W1U_USB,  256, "W1U_USB",  "aml_w1u",    AML_W1U_BT_FW_USB_FILE },
-    {W2_USB,   256, "W2_USB",   "aml_w2_u",   AML_W2_BT_FW_USB_FILE},
-    {W2L_USB,  384, "W2L_USB",  "aml_w2l_u",  AML_W2L_BT_FW_USB_FILE },
-    { 0,       0,    NULL,       NULL,       NULL},
-};
 
 //#define W2L_CHIPSET
 //#define W2_CHIPSET
@@ -129,27 +115,6 @@ static void dump(unsigned char *out, int len)
         fprintf(stderr, "%02x ", out[i]);
     }
     fprintf(stderr, "\n");
-}
-
-static void amlbt_get_mod(void)
-{
-    int idx;
-    const char *bt_name = get_bt_name();
-
-    if (!bt_name) {
-        ALOGE("bt_name is null");
-        return;
-    }
-
-    for (idx = 0; aml_module[idx].name; idx++) {
-        if (strcmp(bt_name, aml_module[idx].name) == 0) {
-            break;
-        }
-    }
-
-    AML_MODULE = aml_module[idx].mod_type;
-
-    ALOGI("aml_module: %d", AML_MODULE);
 }
 
 int get_usb_fd_with_retry(const char *dev, int max_retry, int delay_ms)
@@ -722,35 +687,6 @@ error:
     return err;
 }
 
-static int aml_get_fw_version(unsigned char *str)
-{
-    int fd;
-    int ret;
-    char * fw_version = NULL;
-    str = str + 7; //skip 7byte
-
-    ret = asprintf(&fw_version, "fw_version: date = %02x.%02x, number = 0x%02x%02x\n", *(str+1),*str,*(str+3),*(str+2));
-    if (ret <= 0)
-    {
-        ALOGI("get version value failed\n");
-        goto error;
-    }
-    ALOGI("%s", fw_version);
-    fd = open(FW_VER_FILE,  O_WRONLY|O_CREAT|O_TRUNC, 0666);
-    if (fd < 0)
-    {
-        ALOGE("open fw_file fail");
-        free(fw_version);
-        goto error;
-    }
-    write(fd, fw_version, strlen(fw_version));
-    free(fw_version);
-    close(fd);
-
-error:
-    return 0;
-}
-
 static int aml_hci_reset(int fd)
 {
     int size, err = 0;
@@ -759,7 +695,7 @@ static int aml_hci_reset(int fd)
     hci_command_hdr *cmd_hdr;
     int write_bytes = 0;
 
-    ALOGI("HCI RESET");
+    ALOGD("HCI RESET");
     memset(cmd, 0x0, HCI_MAX_CMD_SIZE);
     cmd_hdr = (void *) (cmd + 1);
     cmd[0]  = HCI_COMMAND_PKT;
@@ -1249,7 +1185,7 @@ error:
 static int aml_set_bdaddr(int fd)
 {
     int size;
-    int err = -1;
+    int ret = -1;
     unsigned char cmd[HCI_MAX_CMD_SIZE];
     unsigned char rsp[HCI_MAX_EVENT_SIZE];
     char *cmd_hdr = NULL;
@@ -1285,8 +1221,8 @@ static int aml_set_bdaddr(int fd)
     if (!aml_get_random(local_addr))
     {
         sprintf(buf, "%02x:%02x:%02x:%02x:%02x:%02x",local_addr[0],local_addr[1], local_addr[2], local_addr[3], local_addr[4], local_addr[5]);
-        err = aml_setprop_write(buf, sizeof(buf));
-        if (err < 0)
+        ret = aml_setprop_write(buf, sizeof(buf));
+        if (ret < 0)
         {
             ALOGI("aml_getprop_write fail");
         }
@@ -1321,9 +1257,9 @@ set_mac:
 
     if (write_bytes)
     {
-        err = write(fd, cmd +1, size-1);
-        if (err != size-1) {
-            ALOGE("Send failed with ret value: %d", err);
+        ret = write(fd, cmd + 1, size - 1);
+        if (ret != size - 1) {
+            ALOGE("Send failed with ret value: %d", ret);
             goto error;
         }
     }
@@ -1332,8 +1268,8 @@ set_mac:
         goto error;
     }
 
-    err = read_event_with_retry(rsp, 5, 10);
-    if ( err < 0) {
+    ret = read_event_with_retry(rsp, 5, 10);
+    if ( ret < 0) {
         ALOGE("Failed to set patch info on Controllern");
         goto error;
     }
@@ -1345,12 +1281,14 @@ set_mac:
         ALOGE("Failed to set_bdaddr, command failure");
         return -1;
     }
+
     aml_get_fw_version(rsp);
-    ALOGI("hci set bdaddr success %d",err);
-    return err;
+    ALOGD("success ret:%d", ret);
+
+    return ret;
 
 error:
-    return err;
+    return ret;
     ALOGI("hci set bdaddr error");
 }
 
@@ -1494,8 +1432,8 @@ int aml_usb_init(int fd)
 
 #ifdef ROKU_PROJECT
     err = aml_set_wakeup_param_roku(fd);
-#elif LINUX_PUBLIC
-    if (AML_MODULE == W1U_USB)
+#elif defined(LINUX_PUBLIC)
+    if (aml_mod_idx == W1U_USB)
     {
         err = aml_set_wakeup_param_w1u(fd);
     }
@@ -1503,8 +1441,10 @@ int aml_usb_init(int fd)
     {
         err = aml_set_wakeup_param_public(fd);
     }
+#elif defined(AUDIO_PROJECT)
+    #warning "AUDIO_PROJECT ignore select APCF config"
 #else
-    #error "Please define ROKU_PROJECT or LINUX_PUBLIC to select the correct APCF config"
+    #error "Please define ROKU_PROJECT/LINUX_PUBLIC to select correct APCF config"
 #endif
     if (err < 0)
     {

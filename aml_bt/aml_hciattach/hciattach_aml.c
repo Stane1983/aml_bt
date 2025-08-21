@@ -48,6 +48,7 @@
 #include <termios.h>
 
 #include "hciattach_aml.h"
+#include "aml_comm.h"
 #include "hciattach.h"
 #include "aml_multibt.h"
 #include "aml_conf.h"
@@ -80,13 +81,6 @@ uint8_t vendor_local_addr[MAC_LEN];
 #define HCI_VSC_WAKE_WRITE_DATA     0xFC22
 #define ICCM_DCCM_MAX               (32 * 1024 * 1024)
 
-/* aml bt module */
-#define W1_UART     0x01
-#define W1U_UART    0x02
-#define W2_UART     0x03
-#define W2L_UART    0x04
-#define W3_UART     0x05
-
 #define USB_POWER_UP        _IO('m', 1)
 #define USB_POWER_DOWN      _IO('m', 2)
 #define SDIO_POWER_UP       _IO('m', 3)
@@ -110,36 +104,10 @@ static vnd_userial_cb_t vnd_userial;
 static int load_efuse = 0;
 static unsigned int add_iccm = 0;
 
-static int AML_MODULE = W1_UART;
-
-//get aml_bt.conf param
-extern unsigned int amlbt_rftype;
-extern unsigned int amlbt_btsink;
-extern unsigned int amlbt_fw_mode;
-extern unsigned int amlbt_pin_mux;
-extern unsigned int amlbt_br_digit_gain;
-extern unsigned int amlbt_edr_digit_gain;
-extern unsigned int amlbt_fwlog_config;
-extern unsigned char APCF_config_manf_data[256];
-extern unsigned int amlbt_manf_cnt;
-extern unsigned int amlbt_factory;
-extern unsigned int amlbt_system;
-extern unsigned int amlbt_manf_para;
-extern unsigned char w1u_manf_data[MANF_ROW][MANF_COLUMN];
-
-
 /******************************************************************************
 **  Extern variables
 ******************************************************************************/
 //extern unsigned char vnd_local_bd_addr[6];
-static const vnd_module_t aml_module[] ={
-    {W1_UART,  256, "W1_UART",  "aml_w1",    AML_W1_BT_FW_UART_FILE },
-    {W1U_UART, 256, "W1U_UART", "aml_w1u_s", AML_W1U_BT_FW_UART_FILE},
-    {W2_UART,  256, "W2_UART",  "aml_w2_s",  AML_W2_BT_FW_UART_FILE },
-    {W2_UART,  256, "W2_UART",  "aml_w2_p",  AML_W2_BT_FW_UART_FILE },
-    {W2L_UART, 384, "W2L_UART", "aml_w2l_s", AML_W2L_BT_FW_UART_FILE},
-    { 0,       0,    NULL,       NULL,       NULL},
-};
 
 typedef int (*callback)(int);
 
@@ -299,7 +267,7 @@ static int aml_set_wake_manf_data(int fd)
     unsigned char APCF_config_manf_data[] =
         {0x01, 0x22, 0xFC, 0x05, 0x19, 0xff, 0x01, 0x0a, 0xb};
 
-    if (AML_MODULE != W1_UART) {
+    if (aml_mod_idx != W1_UART) {
         ALOGI("set wake APCF_config_manf_data");
         ret = aml_hci_send_cmd(fd, (unsigned char *)APCF_config_manf_data,
             sizeof(APCF_config_manf_data),(unsigned char *)rsp, HCI_MAX_EVENT_SIZE);
@@ -312,7 +280,7 @@ static int aml_set_wakeup_para(int fd)
 {
     int ret = 0;
 
-    if (AML_MODULE == W1U_UART) {
+    if (aml_mod_idx == W1U_UART) {
        ret = aml_set_wake_manf_data_w1u(fd);     //w1u
     } else {
         ret = aml_set_wake_manf_data(fd);       //w2/w2l
@@ -336,7 +304,7 @@ int aml_woble_configure(int fd)
     unsigned char le_scan_enable[] = {0x01, 0x0c, 0x20, 0x02, 0x01, 0x00};
     unsigned char host_sleep_VSC[] = {0x01, 0x21, 0xfc, 0x01, 0x01};
 
-    if (AML_MODULE == W1_UART) {
+    if (aml_mod_idx == W1_UART) {
         ALOGI("W1_UART set aml_woble_cfg");
         aml_hci_send_cmd(fd, (unsigned char *)reset_cmd, sizeof(reset_cmd),
             (unsigned char *)rsp, HCI_MAX_EVENT_SIZE);
@@ -555,33 +523,6 @@ error:
 
 }
 
-static int get_fw_version(char *str)
-{
-    int fd;
-    int ret;
-    char * fw_version = NULL;
-    str = str + 7; //skip 7byte
-    ret = asprintf(&fw_version, "fw_version: date = %02x.%02x, number = 0x%02x%02x\n", *(str+1),*str,*(str+3),*(str+2));
-    if (ret <= 0)
-    {
-        goto error;
-    }
-    ALOGI("%s", fw_version);
-    fd = open(FW_VER_FILE,  O_WRONLY|O_CREAT|O_TRUNC, 0666);
-    if (fd < 0)
-    {
-        ALOGE("open fw_file fail");
-        free(fw_version);
-        goto error;
-    }
-    write(fd, fw_version, strlen(fw_version));
-    free(fw_version);
-    close(fd);
-error:
-    return 0;
-}
-
-
 /******************************************************************************
 **  set bdaddr
 ******************************************************************************/
@@ -668,7 +609,7 @@ set_mac:
         return -1;
     }
 
-    get_fw_version((char *)rsp);
+    aml_get_fw_version(rsp);
     ALOGD("success");
 
 error:
@@ -1332,27 +1273,6 @@ static void aml_userial_vendor_set_baud(unsigned char userial_baud)
 
 }
 
-static void amlbt_get_mod(void)
-{
-    int idx;
-    const char *bt_name = get_bt_name();
-
-    if (!bt_name) {
-        ALOGE("bt_name is null");
-        return;
-    }
-
-    for (idx = 0; aml_module[idx].name; idx++) {
-        if (strcmp(bt_name, aml_module[idx].name) == 0) {
-            break;
-        }
-    }
-
-    AML_MODULE = aml_module[idx].mod_type;
-
-    ALOGI("aml_module: %d", AML_MODULE);
-}
-
 static unsigned int hw_config_get_iccm_size(char * file)
 {
     int fd = 0;
@@ -1390,7 +1310,7 @@ static unsigned int hw_config_get_dccm_size(char * file)
     }
 
     //W1U skip 15KB additional iccm
-    if (AML_MODULE == W1U_UART)
+    if (aml_mod_idx == W1U_UART)
     {
         size = read(fd, &add_iccm, 4);
         if (size < 0)
@@ -1411,7 +1331,7 @@ static unsigned int hw_config_get_dccm_size(char * file)
     }
     close(fd);
 
-    if (AML_MODULE == W1U_UART)
+    if (aml_mod_idx == W1U_UART)
     {
         if (dccm_size == W1U_ROM_START_CODE)
         {
@@ -1550,7 +1470,7 @@ static int aml_download_fw_file(int fd, callback func)
     char * p_BT_fwDCCM = NULL;
 
     for (idx = 0; aml_module[idx].name; idx++) {
-        if (AML_MODULE ==  aml_module[idx].mod_type) {
+        if (aml_mod_idx ==  aml_module[idx].mod_type) {
             break;
         }
     }
@@ -1879,7 +1799,7 @@ static int aml_hci_reset(int fd)
     hci_command_hdr *cmd_hdr;
     int flags;
 
-    ALOGI("HCI RESET");
+    ALOGD("HCI RESET");
 
     memset(cmd, 0x0, HCI_MAX_CMD_SIZE);
 
@@ -1944,7 +1864,7 @@ int aml_init(int fd, char *bdaddr)
     ALOGI("Baud rate changed success");
 
     /* download add size fw file */
-    if (AML_MODULE == W1U_UART) {
+    if (aml_mod_idx == W1U_UART) {
         int sdio_fd  = amlbt_open_dev(BT_DEVICE_PATH);
         if (sdio_fd < 0) {
             ALOGE("Download add size fw file fail");

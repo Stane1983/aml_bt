@@ -213,20 +213,22 @@ int read_hci_event(int fd, unsigned char* buf, int size)
 
 static int aml(int fd, struct uart_t *u, struct termios *ti)
 {
-	fprintf(stdout,"aml init\n");
+	ALOGI("amlbt uart init");
 	return aml_init(fd, u->bdaddr);
 }
-
 
 struct uart_t uart[] = {
     /* AML ROME */
     { "aml",    0x0000, 0x0000, HCI_UART_H4, 115200, 4000000,
             FLOW_CTL, DISABLE_PM, UART_DEV_PORT_BT, NULL, aml, NULL },
-
-    /* AML 15p4 */    // HCI_UART_LL
+#ifdef AUDIO_PROJECT
+    // aml_w2l_s support bt/zibgee/thread
+    { "aml_15p4",	 0x0000, 0x0000, HCI_UART_LL, 115200, 4000000,
+            FLOW_CTL, DISABLE_PM, UART_DEV_PORT_BT, NULL, aml, NULL },
+#else
     { "aml_15p4",	 0x0000, 0x0000, HCI_UART_H4, 115200, 4000000,
             FLOW_CTL, DISABLE_PM, UART_DEV_PORT_BT, NULL, aml, NULL },
-
+#endif
     { NULL, 0 }
 };
 
