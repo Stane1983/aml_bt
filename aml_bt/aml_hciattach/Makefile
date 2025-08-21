@@ -1,3 +1,5 @@
+OUT_DIR ?= .
+
 # Cross compiler
 CROSS_COMPILE := $(TARGET_KERNEL_CROSS)
 CC            ?= $(CROSS_COMPILE)gcc
@@ -6,6 +8,8 @@ CC            ?= $(CROSS_COMPILE)gcc
 CFLAGS        := -Wall -g -O2 -Wno-unused-function -Wunused-result -Wno-unused-variable
 
 LDFLAGS := -pthread
+LDFLAGS += -L $(OUT_DIR)/
+
 
 PROJECT ?= linux_public
 
@@ -25,21 +29,24 @@ OBJS := $(SRCS:.c=.o)
 
 # Output binary
 TARGET := aml_hciattach
+TARGET_FULLPATH := $(patsubst %, $(OUT_DIR)/%, $(TARGET))
 
 # Default target
 all: $(TARGET)
 
 # Link rule
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(patsubst %, $(OUT_DIR)/%, $^) -o $(OUT_DIR)/$@
 
 # Compile rule
 %.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	@mkdir -p $(OUT_DIR)
+	$(CC) -c $(CFLAGS) $< -o $(OUT_DIR)/$@
 
 # Clean
 clean:
-	rm -f $(OBJS) $(TARGET) cscope.files cscope.out tags
+	rm -f $(OUT_DIR)/*.o $(OUT_DIR)/*.lo $(TARGET_FULLPATH)
+	rm -f cscope.files cscope.out tags
 
 # Tags
 tags: FORCE
