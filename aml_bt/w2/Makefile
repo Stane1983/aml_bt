@@ -1,6 +1,7 @@
 KERNEL_SRC ?= /lib/modules/$(shell uname -r)/build
 M ?= $(PWD)
-EXTRA_SYMBOLS_USB_PATH ?= $(M)/../../../../../aml-5.15/wifi/amlogic/drivers/w2/aml_drv/Module.symvers
+#EXTRA_SYMBOLS_USB_PATH ?= $(M)/../../../../../aml-5.15/wifi/amlogic/drivers/w2/aml_drv/Module.symvers
+EXTRA_SYMBOLS_USB_PATH ?= $(M)/../../../../wifi/amlogic/drivers/w2/aml_drv/Module.symvers
 ###############################################################################
 # AMLBT
 ###############################################################################
