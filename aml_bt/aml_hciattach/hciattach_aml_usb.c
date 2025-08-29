@@ -108,31 +108,26 @@ static void dump(unsigned char *out, int len)
 {
     int i;
     for (i = 0; i < len; i++) {
-        if (i && !(i % 16))
-        {
-            fprintf(stderr, "\n");
+        if (i && !(i % 16)) {
+            ALOGD("\n");
         }
-        fprintf(stderr, "%02x ", out[i]);
+        ALOGD("%02x ", out[i]);
     }
-    fprintf(stderr, "\n");
+    ALOGD("\n");
 }
-
+#if 0
 int get_usb_fd_with_retry(const char *dev, int max_retry, int delay_ms)
 {
     int usb_fd = -1;
     int retry = 0;
 
     ALOGI("Trying to open BT USB Device: %s max_retry: %d delay_ms %d", dev, max_retry, delay_ms);
-    while (retry < max_retry)
-    {
+    while (retry < max_retry) {
         usb_fd = open(dev, O_RDWR | O_NOCTTY);
-        if (usb_fd >= 0)
-        {
+        if (usb_fd >= 0) {
             ALOGI("BT USB Device %s opened successfully on retry %d with fd %d", dev, retry, usb_fd);
             return usb_fd;
-        }
-        else
-        {   // error = 2 ENOENT   error = 13 EACCES
+        } else {   // error = 2 ENOENT   error = 13 EACCES
             ALOGE("Attempt %d: Failed to open %s, error: %d (%s)", retry + 1, dev, errno, strerror(errno));
             ms_delay(delay_ms);
             retry++;
@@ -142,15 +137,14 @@ int get_usb_fd_with_retry(const char *dev, int max_retry, int delay_ms)
     ALOGE("Failed to open %s after %d retries", dev, max_retry);
     return -1;
 }
-
+#endif
 int get_usb_fd(const char *dev)
 {
     int usb_fd = -1;
 
     ALOGI("The device path passed in is: %s", dev);
     usb_fd = open(dev, O_RDWR | O_NOCTTY);
-    if (usb_fd == -1)
-    {
+    if (usb_fd == -1) {
         ALOGE("Failed to open BT USB Device %s, error: %d", dev, errno);
         return -1;
     }
@@ -164,15 +158,15 @@ static void hex_dump(char *pref, int width, unsigned char *buf, int len)
 
     for (i = 0, n = 1; i < len; i++, n++) {
         if (n == 1)
-            printf("%s", pref);
+            ALOGD("%s", pref);
         printf("%2.2X ", buf[i]);
         if (n == width) {
-            printf("\n");
+            ALOGD("\n");
             n = 0;
         }
     }
     if (i && n!= 1)
-        printf("\n");
+        ALOGD("\n");
 }
 
 static int read_event(unsigned char *buffer)
@@ -197,13 +191,11 @@ static int read_event(unsigned char *buffer)
 
     ///@}
 
-    while (evt_state < EVT_END)
-    {
+    while (evt_state < EVT_END) {
         FD_ZERO(&read_fds);
         FD_SET(g_usb_fd, &read_fds);
         rval = select(g_usb_fd + 1, &read_fds, NULL, NULL, &wait_time);
-        if (rval > 0)
-        {
+        if (rval > 0) {
             switch (evt_state)
             {
                 case EVT_TYPE:
@@ -237,12 +229,10 @@ static int read_event(unsigned char *buffer)
                     break;
             }
         }
-        else if (rval == 0)
-        {
+        else if (rval == 0) {
             timeout_cnt++;
-            if (timeout_cnt > 150)
-            {
-                printf("Rx event parameter timeout!\n");
+            if (timeout_cnt > 150) {
+                ALOGE("Rx event parameter timeout!\n");
                 return 0;
             }
         }
@@ -262,12 +252,10 @@ static int read_event_with_retry(unsigned char *buffer, int max_retry, int delay
     int retry = 0;
 
     ALOGI("read event with retry max_retry: %d, delay: %d\n",max_retry, delay_ms);
-    while (retry < max_retry)
-    {
+    while (retry < max_retry) {
         ms_delay(delay_ms);
         err = read_event(buffer);
-        if (err > 0)
-        {
+        if (err > 0) {
             ALOGI("read event success err %d retry: %d\n",err, retry);
             break;
         } else {
@@ -276,8 +264,7 @@ static int read_event_with_retry(unsigned char *buffer, int max_retry, int delay
         retry++;
     }
 
-    if (err <= 0)
-    {
+    if (err <= 0) {
         ALOGE("read_event_with_retry: failed after %d retries\n", max_retry);
     }
 
@@ -291,24 +278,20 @@ static int hci_send_cmd(unsigned char *buf, int len)
     //unsigned char hcitype[] = {HCI_pduCOMMAND};
     //write_bytes = write(g_usb_fd, hcitype, 1);
     write_bytes = write(g_usb_fd, buf, len);
-    if (write_bytes)
-    {
+    if (write_bytes) {
         //write_bytes = write(g_usb_fd, buf + 1, len -1);
-        if (debug)
-        {
+        if (debug) {
             fprintf(stderr, "writing\n");
             dump(buf, len);
 
             if (write_bytes == -1) {
-                fprintf(stderr,"Failed to write bytes to uart,error code is[%d]\n",errno);
+                ALOGE("Failed to write bytes to uart,error code is[%d]\n",errno);
             }
         }
-         //printf("Send hcicommand success! write_bytes:%d\n",write_bytes);
+         //ALOGI("Send hcicommand success! write_bytes:%d\n",write_bytes);
         //return 0;
-    }
-    else
-    {
-        printf("Send hcicommand failed!\n");
+    } else {
+        ALOGE("Send hcicommand failed!\n");
         return -1;
     }
     return 0;
@@ -328,12 +311,10 @@ static unsigned int read_bt_register(unsigned int address)
     aml_insert_uint32(&pdu[4], address);
     hci_send_cmd(pdu, sizeof(pdu));
     ret = read_event(recv_data);
-    if (ret > 0)
-    {
+    if (ret > 0) {
         if ((recv_data[0] == 0x04) &&
             (recv_data[4] == TCI_DBG_READ_REG) &&
-            (recv_data[5] == PROP_OGF))
-        {
+            (recv_data[5] == PROP_OGF)) {
             data = aml_get_uint32(&recv_data[7]);
             return data;
         }
@@ -356,12 +337,10 @@ static void write_bt_register(unsigned int address, unsigned int value)
     aml_insert_uint32(&pdu[8], value);
     hci_send_cmd(pdu, sizeof(pdu));
     ret = read_event(recv_data);
-    if (ret > 0)
-    {
+    if (ret > 0) {
         if ((recv_data[0] == 0x04) &&
             (recv_data[4] == TCI_DBG_WRITE_REG) &&
-            (recv_data[5] == PROP_OGF))
-        {
+            (recv_data[5] == PROP_OGF)) {
             goto WriteSuccess;
         }
     }
@@ -378,8 +357,7 @@ static int aml_tci_load_bt_fw_cmd(int opcode, unsigned char data_len, unsigned i
     int rx_len = 0;
     unsigned char rx_buff[1024] = {0};
     unsigned char *temp_data = (unsigned char*)malloc(300);
-    if (!temp_data)
-    {
+    if (!temp_data) {
         ALOGE("New space fail");
         return -1;
     }
@@ -388,8 +366,7 @@ static int aml_tci_load_bt_fw_cmd(int opcode, unsigned char data_len, unsigned i
     pdu[2] = data_len;
     length = pdu[2] + 3;
     aml_insert_uint32(pdu + 3, addr);
-    for (i = 0; i < data_len; i += 1)
-    {
+    for (i = 0; i < data_len; i += 1) {
         pdu[i + 7] = *(data + i);
     }
     //temp_data[0] = HCI_pduCOMMAND;
@@ -400,8 +377,7 @@ static int aml_tci_load_bt_fw_cmd(int opcode, unsigned char data_len, unsigned i
 
     //dump(temp_data, length + 1);
     rx_len = read_event(rx_buff);
-    if (rx_len > 0)
-    {
+    if (rx_len > 0) {
         free(temp_data);
         return 0;
     }
@@ -433,8 +409,7 @@ static int aml_usb_download_fw_img()
         cmd_len = data_len + 4;
         result = aml_tci_load_bt_fw_cmd(TCI_DOWNLOAD_BT_FW, cmd_len,
           ICCM_RAM_BASE + offset, bufferICCM + offset);
-        if (result)
-        {
+        if (result) {
             ALOGE("Download iccm data error");
             return FAILED;
         }
@@ -510,15 +485,13 @@ static int aml_get_a2dp_sink_enable(void)
     unsigned char a2dp_sink_enable = 0;
 
     fd_a2dp_cfg = open(AML_A2DP_CFG_FILE, O_RDONLY);
-    if (fd_a2dp_cfg < 0)
-    {
+    if (fd_a2dp_cfg < 0) {
         ALOGE("In %s, Open failed:%s", __FUNCTION__, strerror(errno));
         return -1;
     }
 
     size = read(fd_a2dp_cfg, buffer, sizeof(buffer));
-    if (size < 0)
-    {
+    if (size < 0) {
         ALOGE("In %s, Read failed:%s", __FUNCTION__, strerror(errno));
         close(fd_a2dp_cfg);
         return -1;
@@ -548,15 +521,13 @@ static int aml_get_antenna_number(void)
     char buffer[255] = { 0 };
 
     fd_ant_num = open(AML_BT_CONFIG_RF_FILE, O_RDONLY);
-    if (fd_ant_num < 0)
-    {
+    if (fd_ant_num < 0) {
             ALOGE("In %s, Open failed:%s", __FUNCTION__, strerror(errno));
             return -1;
     }
 
     size = read(fd_ant_num, buffer, sizeof(buffer));
-    if (size < 0)
-    {
+    if (size < 0) {
         ALOGE("In %s, Read failed:%s", __FUNCTION__, strerror(errno));
         close(fd_ant_num);
         return -1;
@@ -587,17 +558,13 @@ static int aml_get_config_params(void)
     ant_num = aml_get_antenna_number();
     ALOGI("a2dp_sink_enable=%d ,antenna number=%d", a2dp_sink,ant_num);
 
-    if (ant_num == 1)
-    {
+    if (ant_num == 1) {
         reg_data = 0x10000000; //bit28 means RF_ANT_SINGLE
-    }
-    else if (ant_num == 2)
-    {
+    } else if (ant_num == 2) {
         reg_data = 0x20000000; //bit29 means RF_ANT_DOUBLE
     }
 
-    if (a2dp_sink == 1)
-    {
+    if (a2dp_sink == 1) {
         reg_data |= (1<<25);    // bit25 means a2dp_sink_enable.
     }
 
@@ -634,14 +601,12 @@ static unsigned char * aml_getprop_read(const char* str)
     memset(buf, '\0', sizeof(buf));
     ALOGI("opening %s", str);
     fd = open(str, O_RDONLY|O_CREAT, 0666);
-    if (fd < 0)
-    {
+    if (fd < 0) {
         ALOGE("open read");
         goto error;
     }
     n = read(fd, buf, sizeof(buf)-1);
-    if (n < sizeof(buf)-1)
-    {
+    if (n < sizeof(buf)-1) {
         ALOGE("n < sizeof(buf)");
         close(fd);
         goto error;
@@ -650,8 +615,7 @@ static unsigned char * aml_getprop_read(const char* str)
     buf[sizeof(buf)-1] ='\0';
     close(fd);
 
-    if (strnlen(buf, 17) != 17)
-    {
+    if (strnlen(buf, 17) != 17) {
         ALOGE("don't matching bt mac");
         goto error;
     }
@@ -671,14 +635,12 @@ static int aml_setprop_write(const char *str, int size)
 
     ALOGI("opening %s\n", str);
     fd = open(SAVE_MAC, O_WRONLY|O_CREAT, 0666);
-    if (fd < 0)
-    {
+    if (fd < 0) {
         ALOGE("open write");
         goto error;
     }
     err = write(fd, str, size);
-    if (err != size)
-    {
+    if (err != size) {
         ALOGE("write fail");
     }
     close(fd);
@@ -710,8 +672,7 @@ static int aml_hci_reset(int fd)
 
     unsigned char hcitype[] = {HCI_pduCOMMAND};
     write_bytes = write(fd, hcitype, 1);
-    if (write_bytes)
-    {
+    if (write_bytes) {
         err = write(fd, cmd +1, size-1);
         if (err != size-1) {
             ALOGE("Send failed with ret value: %d", err);
@@ -738,7 +699,7 @@ static int aml_hci_reset(int fd)
     return err;
 
 error:
-    ALOGI("hci reset error");
+    ALOGE("hci reset error");
     return err;
 }
 
@@ -757,35 +718,28 @@ static int aml_set_wakeup_param_roku(int fd)
 
     ALOGI("set wake roku_manf_data");
     FILE *config_file = fopen(AML_BT_CFG_FILE, "r");
-    if (!config_file)
-    {
+    if (!config_file) {
         ALOGE("Failed to open aml_bt.conf");
         return -EINVAL;
     }
 
-    while (fgets(line, sizeof(line), config_file) && !found)
-    {
-        if (strstr(line, "APCF_config_manf_data") != NULL)
-        {
+    while (fgets(line, sizeof(line), config_file) && !found) {
+        if (strstr(line, "APCF_config_manf_data") != NULL) {
             char *value = strchr(line, '=');
-            if (value)
-            {
+            if (value) {
                 value++;
                 char *newline = strchr(value, '\n');
                 if (newline) *newline = '\0';
 
                 size_t len = strlen(value);
-                if (len != 18)
-                {
+                if (len != 18) {
                     ALOGE("Invalid APCF_config_manf_data length: %zu", len);
                     fclose(config_file);
                     return -EINVAL;
                 }
 
-                for (int i = 0; i < 9; i++)
-                {
-                    if (sscanf(value + (i * 2), "%2hhx", &APCF_config_manf_data[i]) != 1)
-                    {
+                for (int i = 0; i < 9; i++) {
+                    if (sscanf(value + (i * 2), "%2hhx", &APCF_config_manf_data[i]) != 1) {
                         ALOGE("Failed to parse APCF_config_manf_data at index %d", i);
                         fclose(config_file);
                         return -EINVAL;
@@ -798,8 +752,7 @@ static int aml_set_wakeup_param_roku(int fd)
     }
     fclose(config_file);
 
-    if (!found)
-    {
+    if (!found) {
         ALOGE("APCF_config_manf_data not found in config file");
         return -EINVAL;
     }
@@ -826,8 +779,7 @@ static int aml_set_wakeup_param_roku(int fd)
     unsigned char hcitype[] = {HCI_pduCOMMAND};
     write_bytes = write(fd, hcitype, 1);
 
-    if (write_bytes)
-    {
+    if (write_bytes) {
         err = write(fd, cmd +1, size-1);
         if (err != size-1) {
             ALOGE("Send failed with ret value: %d", err);
@@ -848,7 +800,7 @@ static int aml_set_wakeup_param_roku(int fd)
 
 error:
     return err;
-    ALOGI("hci set apcf error");
+    ALOGE("hci set apcf error");
 }
 
 static int aml_set_wakeup_param_w1u(int fd)
@@ -866,8 +818,7 @@ static int aml_set_wakeup_param_w1u(int fd)
     unsigned char default_manf_data[] = {0x01, 0x22, 0xFC, 0x05, 0x19, 0xff, 0x01, 0x0a, 0xb};
 
     ALOGI("set wake w1u_manf_data");
-    if (amlbt_manf_para == 0)
-    {
+    if (amlbt_manf_para == 0) {
         ALOGI("amlbt_manf_para is 0, use default");
         ALOGI("set wake default_manf_data");
         //err = aml_hci_send_cmd(fd, (unsigned char *)default_manf_data,
@@ -883,16 +834,13 @@ static int aml_set_wakeup_param_w1u(int fd)
     memset(total_manf_data, 0, LOCAL_BDADDR_PATH_BUFFER_LEN);
 
     while (cnt < MANF_ROW) {
-        if ((BIT(cnt) & amlbt_manf_para) != 0)//15 index->0/1/2/3
-        {
+        //15 index->0/1/2/3
+        if ((BIT(cnt) & amlbt_manf_para) != 0) {
             int group_len = w1u_manf_data[cnt][0] + 1;//param length + payload = 1 + 9
-            if ((total_len + group_len) > LOCAL_BDADDR_PATH_BUFFER_LEN)
-            {
+            if ((total_len + group_len) > LOCAL_BDADDR_PATH_BUFFER_LEN) {
                 ALOGE("APCF buffer overflow!");
                 break;
-            }
-            else
-            {
+            } else {
                 memcpy(&total_manf_data[total_len], w1u_manf_data[cnt], group_len);
                 ALOGI("%#x %#x %#x %#x %#x %#x %#x %#x", total_manf_data[total_len], total_manf_data[total_len+1],
                         total_manf_data[total_len+2], total_manf_data[total_len+3],
@@ -927,8 +875,7 @@ static int aml_set_wakeup_param_w1u(int fd)
     unsigned char hcitype[] = {HCI_pduCOMMAND};
     write_bytes = write(fd, hcitype, 1);
 
-    if (write_bytes)
-    {
+    if (write_bytes) {
         err = write(fd, cmd + 1, cmd_size - 1);
         if (err != cmd_size - 1) {
             ALOGE("Send failed with ret value: %d", err);
@@ -951,7 +898,7 @@ static int aml_set_wakeup_param_w1u(int fd)
 
 error:
     return err;
-    ALOGI("hci set w1u_manf_data error");
+    ALOGE("hci set w1u_manf_data error");
 }
 
 static int aml_set_wakeup_param_public(int fd)
@@ -988,8 +935,7 @@ static int aml_set_wakeup_param_public(int fd)
     unsigned char hcitype[] = {HCI_pduCOMMAND};
     write_bytes = write(fd, hcitype, 1);
 
-    if (write_bytes)
-    {
+    if (write_bytes) {
         err = write(fd, cmd + 1, size - 1);
         if (err != size - 1) {
             ALOGE("Send failed with ret value: %d", err);
@@ -1011,7 +957,7 @@ static int aml_set_wakeup_param_public(int fd)
 
 error:
     return err;
-    ALOGI("hci set ManfData_public error");
+    ALOGE("hci set ManfData_public error");
 }
 
 #if 0
@@ -1028,35 +974,28 @@ static int aml_set_apcf_config_default(int fd)
     unsigned char manf_data[DATA_LENGTH] = {0};
 
     FILE *config_file = fopen(AML_BT_CFG_FILE, "r");
-    if (!config_file)
-    {
+    if (!config_file) {
         ALOGE("Failed to open aml_bt.conf");
         return -EINVAL;
     }
 
-    while (fgets(line, sizeof(line), config_file) && !found)
-    {
-        if (strstr(line, "ManfData_Default") != NULL)
-        {
+    while (fgets(line, sizeof(line), config_file) && !found) {
+        if (strstr(line, "ManfData_Default") != NULL) {
             char *value = strchr(line, '=');
-            if (value)
-            {
+            if (value) {
                 value++;
                 char *newline = strchr(value, '\n');
                 if (newline) *newline = '\0';
 
                 size_t len = strlen(value);
-                if (len != DATA_LENGTH * 2)
-                {
+                if (len != DATA_LENGTH * 2) {
                     ALOGE("Invalid ManfData_Default length: %zu", len);
                     fclose(config_file);
                     return -EINVAL;
                 }
 
-                for (int i = 0; i < DATA_LENGTH; i++)
-                {
-                    if (sscanf(value + (i * 2), "%2hhx", &manf_data[i]) != 1)
-                    {
+                for (int i = 0; i < DATA_LENGTH; i++) {
+                    if (sscanf(value + (i * 2), "%2hhx", &manf_data[i]) != 1) {
                         ALOGE("Failed to parse ManfData_Default at index %d", i);
                         fclose(config_file);
                         return -EINVAL;
@@ -1068,8 +1007,7 @@ static int aml_set_apcf_config_default(int fd)
     }
     fclose(config_file);
 
-    if (!found)
-    {
+    if (!found) {
         ALOGE("ManfData_Default not found in config file");
         return -EINVAL;
     }
@@ -1103,8 +1041,7 @@ static int aml_set_apcf_config_default(int fd)
     unsigned char hcitype[] = {HCI_pduCOMMAND};
     write_bytes = write(fd, hcitype, 1);
 
-    if (write_bytes)
-    {
+    if (write_bytes) {
         err = write(fd, cmd + 1, size - 1);
         if (err != size - 1) {
             ALOGE("Send failed with ret value: %d", err);
@@ -1129,7 +1066,7 @@ static int aml_set_apcf_config_default(int fd)
 
 error:
     return err;
-    ALOGI("hci set ManfData_Default error");
+    ALOGE("hci set ManfData_Default error");
 }
 #endif
 
@@ -1173,7 +1110,7 @@ static int aml_check_efuse_bdaddr(int fd)
         && (rsp[11] == 0x2d)
         && (rsp[12] == 0xae)
         || (rsp[2]  == 0x01)) {
-        ALOGI("No valid mac in efuse");
+        ALOGE("No valid mac in efuse");
         err = -1;
     }
     ALOGI("done");
@@ -1194,20 +1131,17 @@ static int aml_set_bdaddr(int fd)
     unsigned char *tempbuf;
     unsigned char local_addr[MAC_LEN];
 
-    if ((tempbuf = aml_getprop_read(PCEDIT_MAC)) != NULL)
-    {
+    if ((tempbuf = aml_getprop_read(PCEDIT_MAC)) != NULL) {
         memcpy(local_addr, tempbuf, MAC_LEN);
         goto set_mac;
     }
     /*
-    else if (aml_check_efuse_bdaddr(fd) > 0 )
-    {
+    else if (aml_check_efuse_bdaddr(fd) > 0 ) {
         ALOGI("use mac in efuse");
         memset(local_addr, 0, MAC_LEN);
         goto set_mac;
     }*/
-    else if ((tempbuf = aml_getprop_read(SAVE_MAC)) != NULL)
-    {
+    else if ((tempbuf = aml_getprop_read(SAVE_MAC)) != NULL) {
         memcpy(local_addr, tempbuf, MAC_LEN);
         goto set_mac;
     }
@@ -1218,13 +1152,11 @@ static int aml_set_bdaddr(int fd)
     local_addr[0] = 0x22;
     local_addr[1] = 0x22;
     /*get random number from /dev/random, if succeed save it to file*/
-    if (!aml_get_random(local_addr))
-    {
+    if (!aml_get_random(local_addr)) {
         sprintf(buf, "%02x:%02x:%02x:%02x:%02x:%02x",local_addr[0],local_addr[1], local_addr[2], local_addr[3], local_addr[4], local_addr[5]);
         ret = aml_setprop_write(buf, sizeof(buf));
-        if (ret < 0)
-        {
-            ALOGI("aml_getprop_write fail");
+        if (ret < 0) {
+            ALOGE("aml_getprop_write fail");
         }
     } else {
         ALOGE("Failed to get random mac addr");
@@ -1255,16 +1187,13 @@ set_mac:
     unsigned char hcitype[] = {HCI_pduCOMMAND};
     write_bytes = write(fd, hcitype, 1);
 
-    if (write_bytes)
-    {
+    if (write_bytes) {
         ret = write(fd, cmd + 1, size - 1);
         if (ret != size - 1) {
             ALOGE("Send failed with ret value: %d", ret);
             goto error;
         }
-    }
-    else
-    {
+    } else {
         goto error;
     }
 
@@ -1283,13 +1212,12 @@ set_mac:
     }
 
     aml_get_fw_version(rsp);
-    ALOGD("success ret:%d", ret);
-
+    ALOGI("success ret:%d", ret);
     return ret;
 
 error:
     return ret;
-    ALOGI("hci set bdaddr error");
+    ALOGE("hci set bdaddr error");
 }
 
 static int aml_download_firmware(char* firmware_file_path)
@@ -1306,49 +1234,43 @@ static int aml_download_firmware(char* firmware_file_path)
     int success = 1;
 
     memset(fw_bin_file, 0, sizeof(fw_bin_file));
-    if ((binfile_fd = open(firmware_file_path, O_RDONLY)) < 0)
-    {
-        printf("Could not open %s\n", firmware_file_path);
+    if ((binfile_fd = open(firmware_file_path, O_RDONLY)) < 0) {
+        ALOGE("Could not open %s\n", firmware_file_path);
         return err;
     }
-    printf("open firmware file success binfile_fd:%d", binfile_fd);
+    ALOGI("open firmware file success binfile_fd:%d", binfile_fd);
     size = read(binfile_fd, &iccm_size, 4);
-    printf("hw_config_get_iccm_size iccm_size:%d size:%d\n", iccm_size,size);
-    if (size < 0)
-    {
-        printf("---------1hw_config_get_iccm_size read error!---------");
+    ALOGI("hw_config_get_iccm_size iccm_size:%d size:%d\n", iccm_size,size);
+    if (size < 0) {
+        ALOGE("---------1hw_config_get_iccm_size read error!---------");
         close(binfile_fd);
         return err;
     }
-    printf("---------2hw_config_get_iccm_size iccm_size %d---------\n", iccm_size);
+    ALOGI("---------2hw_config_get_iccm_size iccm_size %d---------\n", iccm_size);
     size = read(binfile_fd, &dccm_size, 4);
-    if (size < 0)
-    {
-        printf("---------hw_config_get_dccm_size read error!---------");
+    if (size < 0) {
+        ALOGE("---------hw_config_get_dccm_size read error!---------");
         close(binfile_fd);
         return err;
     }
-    printf("---------hw_config_get_dccm_size dccm_size %d---------\n", dccm_size);
+    ALOGI("---------hw_config_get_dccm_size dccm_size %d---------\n", dccm_size);
     BT_fwICCM = (unsigned char*)malloc(iccm_size);
     BT_fwDCCM = (unsigned char*)malloc(dccm_size);
-    if ((!BT_fwICCM) ||(!BT_fwDCCM))
-    {
-        printf("Malloc failed!\n");
+    if ((!BT_fwICCM) ||(!BT_fwDCCM)) {
+        ALOGE("Malloc failed!\n");
         return err;
     }
     size = read(binfile_fd, BT_fwICCM, iccm_size);
-    if (size < 0)
-    {
-        printf("---------hw_config_get_iccm_data error!---------");
+    if (size < 0) {
+        ALOGE("---------hw_config_get_iccm_data error!---------");
         close(binfile_fd);
         free(BT_fwICCM);
         free(BT_fwDCCM);
         return err;
     }
     size = read(binfile_fd, BT_fwDCCM, dccm_size);
-    if (size < 0)
-    {
-        printf("---------hw_config_get_dccm_data error!---------");
+    if (size < 0) {
+        ALOGE("---------hw_config_get_dccm_data error!---------");
         close(binfile_fd);
         free(BT_fwICCM);
         free(BT_fwDCCM);
@@ -1360,10 +1282,8 @@ static int aml_download_firmware(char* firmware_file_path)
     if (aml_usb_download_fw_img() == FAILED) return err;
     result = aml_tci_write_register(TCI_WRITE_REG, 0xa70014, 0x0000000);
     if (!result) {
-        ALOGE("close fw load");;
-    }
-    else
-    {
+        ALOGE("close fw load");
+    } else {
         ALOGE("close fw load failed");
         return err;
     }
@@ -1371,16 +1291,14 @@ static int aml_download_firmware(char* firmware_file_path)
     reg_data = aml_get_config_params();
     ALOGI("0xf03040 reg_data=%u", reg_data);
     result = aml_tci_write_register(TCI_WRITE_REG, 0xf03040, reg_data);
-    if (result == TCI_WRITE_READ_FAILED)
-    {
-        ALOGE("BT CPU can't work");;
+    if (result == TCI_WRITE_READ_FAILED) {
+        ALOGE("BT CPU can't work");
         return err;
     }
 
     result = aml_tci_write_register(TCI_WRITE_REG, 0xf03058, 0x0000000);
-    if (result == TCI_WRITE_READ_FAILED)
-    {
-        ALOGE("reset controller failed");;
+    if (result == TCI_WRITE_READ_FAILED) {
+        ALOGE("reset controller failed");
         return err;
     }
 
@@ -1406,8 +1324,7 @@ int aml_usb_init(int fd)
 
 #if 0
     err = aml_download_firmware(AML_W1U_BT_FW_USB_FILE);
-    if (err < 0)
-    {
+    if (err < 0) {
         ALOGE("Download fw file failed!");
         goto error;
     }
@@ -1423,8 +1340,7 @@ int aml_usb_init(int fd)
     amlbt_load_conf();
 
     err = aml_set_bdaddr(fd);
-    if (err < 0)
-    {
+    if (err < 0) {
         ALOGE("HCI set bdaddr failed");
         goto error;
     }
@@ -1433,12 +1349,9 @@ int aml_usb_init(int fd)
 #ifdef ROKU_PROJECT
     err = aml_set_wakeup_param_roku(fd);
 #elif defined(LINUX_PUBLIC)
-    if (aml_mod_idx == W1U_USB)
-    {
+    if (aml_mod_idx == W1U_USB) {
         err = aml_set_wakeup_param_w1u(fd);
-    }
-    else
-    {
+    } else {
         err = aml_set_wakeup_param_public(fd);
     }
 #elif defined(AUDIO_PROJECT)
@@ -1446,8 +1359,7 @@ int aml_usb_init(int fd)
 #else
     #error "Please define ROKU_PROJECT/LINUX_PUBLIC to select correct APCF config"
 #endif
-    if (err < 0)
-    {
+    if (err < 0) {
         ALOGE("HCI set wake manf data failed");
         goto error;
     }

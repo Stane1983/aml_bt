@@ -522,8 +522,7 @@ int main(int argc, char *argv[])
 
         //get amlbt usb usb device file descriptor
         g_usb_fd = get_usb_fd(dev);
-        if (g_usb_fd == -1)
-        {
+        if (g_usb_fd == -1) {
             fprintf(stderr, "open usb device failed!\n");
             exit(1);
         }

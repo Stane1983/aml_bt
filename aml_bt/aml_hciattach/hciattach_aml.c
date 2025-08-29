@@ -120,14 +120,14 @@ static int do_write(int fd, unsigned char *buf, int len)
     do {
         ret = write(fd, buf + write_offset, write_len);
         if (ret < 0) {
-            ALOGI("write fail ret:%d,err:%s", ret, strerror(errno));
+            ALOGE("write fail ret:%d,err:%s", ret, strerror(errno));
             return ret;
         } else if (ret == 0) {
-            ALOGI("write fail with ret:0,err:%s", strerror(errno));
+            ALOGE("write fail with ret:0,err:%s", strerror(errno));
             return ret;
         } else {
             if (ret < write_len) {
-                ALOGI("write pending,do write ret:%d,err:%s", ret, strerror(errno));
+                ALOGE("write pending,do write ret:%d,err:%s", ret, strerror(errno));
                 write_len = write_len - ret;
                 write_offset = ret;
             } else {
@@ -147,7 +147,7 @@ static int aml_hci_send_cmd(int fd, unsigned char *cmd, int cmd_size, unsigned c
 
     ret = do_write(fd, cmd, cmd_size);
     if (ret != cmd_size) {
-        ALOGI("send fail,ret:%d", ret);
+        ALOGE("send fail,ret:%d", ret);
         goto exit;
     }
 
@@ -156,7 +156,7 @@ static int aml_hci_send_cmd(int fd, unsigned char *cmd, int cmd_size, unsigned c
     /* Wait for command complete event */
     ret = read_hci_event(fd, rsp, rsp_size);
     if (ret < 0) {
-        ALOGI("read fail,ret:%d", ret);
+        ALOGE("read fail,ret:%d", ret);
         goto exit;
     }
 
@@ -192,8 +192,7 @@ static int aml_set_wake_manf_data_w1u(int fd)
     int cnt = 0;
 
     ALOGI("set wake w1u_manf_data");
-    if (amlbt_manf_para == 0)
-    {
+    if (amlbt_manf_para == 0) {
         ALOGI("amlbt_manf_para is 0, use default");
         ALOGI("set wake default_manf_data");
         ret = aml_hci_send_cmd(fd, (unsigned char *)default_manf_data,
@@ -209,16 +208,13 @@ static int aml_set_wake_manf_data_w1u(int fd)
     memset(total_manf_data, 0, LOCAL_BDADDR_PATH_BUFFER_LEN);
 
     while (cnt < MANF_ROW) {
-        if ((BIT(cnt) & amlbt_manf_para) != 0)//15 index->0/1/2/3
-        {
+        //15 index->0/1/2/3
+        if ((BIT(cnt) & amlbt_manf_para) != 0) {
             int group_len = w1u_manf_data[cnt][0] + 1;//param length + payload = 1 + 9
-            if ((total_len + group_len) > LOCAL_BDADDR_PATH_BUFFER_LEN)
-            {
+            if ((total_len + group_len) > LOCAL_BDADDR_PATH_BUFFER_LEN) {
                 ALOGE("APCF buffer overflow!");
                 break;
-            }
-            else
-            {
+            } else {
                 memcpy(&total_manf_data[total_len], w1u_manf_data[cnt], group_len);
                 ALOGI("%#x %#x %#x %#x %#x %#x %#x %#x", total_manf_data[total_len], total_manf_data[total_len+1],
                         total_manf_data[total_len+2], total_manf_data[total_len+3],
@@ -391,8 +387,7 @@ static unsigned char aml_userial_to_tcio_baud(unsigned char cfg_baud, unsigned i
         *baud = B1200;
     else if (cfg_baud == USERIAL_BAUD_600)
         *baud = B600;
-    else
-    {
+    else {
         ALOGE("userial vendor open: unsupported baud idx %i", cfg_baud);
         *baud = B115200;
         return FALSE;
@@ -470,14 +465,12 @@ static uint8_t * aml_getprop_read(const char* str)
     char buf[18];
     memset(buf, '\0', sizeof(buf));
     fd = open(str, O_RDONLY|O_CREAT, 0666);
-    if (fd < 0)
-    {
+    if (fd < 0) {
         ALOGE("open SAVE_MAC read");
         goto error;
     }
     n = read(fd, buf, sizeof(buf)-1);
-    if (n < sizeof(buf)-1)
-    {
+    if (n < sizeof(buf)-1) {
         ALOGE("n < sizeof(buf)");
         close(fd);
         goto error;
@@ -486,8 +479,7 @@ static uint8_t * aml_getprop_read(const char* str)
     buf[sizeof(buf)-1] ='\0';
     close(fd);
 
-    if (strnlen(buf, 17) != 17)
-    {
+    if (strnlen(buf, 17) != 17) {
         ALOGE("don't matching bt mac");
         goto error;
     }
@@ -506,14 +498,12 @@ static int aml_setprop_write(const char *str, int size)
     int err = -1;
     int fd;
     fd = open(SAVE_MAC, O_WRONLY|O_CREAT, 0666);
-    if (fd < 0)
-    {
+    if (fd < 0) {
         ALOGE("open SAVE_MAC write");
         goto error;
     }
     err = write(fd, str, size);
-    if (err != size)
-    {
+    if (err != size) {
         ALOGE("write fail");
     }
     close(fd);
@@ -537,13 +527,11 @@ static int aml_set_bdaddr(int fd)
     uint8_t *tempbuf;
 
     uint8_t local_addr[MAC_LEN];
-    if ((tempbuf = aml_getprop_read(NUIFYKEY_MAC)) != NULL)
-    {
+    if ((tempbuf = aml_getprop_read(NUIFYKEY_MAC)) != NULL) {
         memcpy(local_addr, tempbuf, MAC_LEN);
         goto set_mac;
     }
-    else if ((tempbuf = aml_getprop_read(SAVE_MAC)) != NULL)
-    {
+    else if ((tempbuf = aml_getprop_read(SAVE_MAC)) != NULL) {
         memcpy(local_addr, tempbuf, MAC_LEN);
         goto set_mac;
     }
@@ -562,8 +550,7 @@ static int aml_set_bdaddr(int fd)
     sprintf(buf, "%02x:%02x:%02x:%02x:%02x:%02x",local_addr[0],\
                      local_addr[1], local_addr[2], local_addr[3], local_addr[4], local_addr[5]);
     err = aml_setprop_write(buf, sizeof(buf));
-    if (err < 0)
-    {
+    if (err < 0) {
         ALOGI("aml_getprop_write fail");
     }
 
@@ -648,15 +635,13 @@ static int hw_config_set_rf_params(int fd)
 
     //////////////////////////////////////////////////////////////////
     fd_a2dp_cfg = open(AML_A2DP_CFG_FILE, O_RDONLY);
-    if (fd_a2dp_cfg < 0)
-    {
+    if (fd_a2dp_cfg < 0) {
         ALOGI("In %s, Open fail:%s", __FUNCTION__, strerror(errno));
         return FALSE;
     }
 
     size = read(fd_a2dp_cfg, buffer, sizeof(buffer));
-    if (size < 0)
-    {
+    if (size < 0) {
         ALOGI("In %s, Read fail:%s", __FUNCTION__, strerror(errno));
         close(fd_a2dp_cfg);
         return FALSE;
@@ -684,19 +669,16 @@ static int hw_config_set_rf_params(int fd)
 
     *cmd_hdr++ = 0x08;           /* parameter length */
     UINT32_TO_STREAM(cmd_hdr, 0xf03040);  /* addr */
-    if (antenna_num == 1)
-    {
+    if (antenna_num == 1) {
         // UINT32_TO_STREAM(p, 0x10000000);
         reg_data = 0x10000000;
     }
-    else if (antenna_num == 2)
-    {
+    else if (antenna_num == 2) {
         //UINT32_TO_STREAM(p, 0x20000000);
         reg_data = 0x20000000;
     }
 
-    if (a2dp_sink_enable == 1)
-    {
+    if (a2dp_sink_enable == 1) {
         reg_data |= (1<<25);    // bit25 means a2dp_sink_enable.
     }
 
@@ -746,17 +728,14 @@ static int hw_config_set_rf_params(int fd)
     *cmd_hdr++ = 0x08;           /* parameter length */
     UINT32_TO_STREAM(cmd_hdr, 0xf03040);  /* addr */
 
-    if (antenna_num == 1)
-    {
+    if (antenna_num == 1) {
         reg_data = 0x10000000; //bit28 means RF_ANT_SINGLE
     }
-    else if (antenna_num == 2)
-    {
+    else if (antenna_num == 2) {
         reg_data = 0x20000000; //bit29 means RF_ANT_DOUBLE
     }
 
-    if (a2dp_sink_enable == 1)
-    {
+    if (a2dp_sink_enable == 1) {
         reg_data |= (1<<25);    // bit25 means a2dp_sink_enable.
     }
     ALOGI("reg_data=%x", reg_data); //0x12000000
@@ -828,18 +807,14 @@ static int aml_start_cpu_uart(int fd, callback func)
     ALOGD("success");
     ms_delay(MAC_DELAY);
     ALOGI("delay %d",MAC_DELAY);
-    if (!load_efuse && func != NULL)
-    {
+    if (!load_efuse && func != NULL) {
         err = func(fd);
-        if (err < 0)
-        {
+        if (err < 0) {
             ALOGE("cmd send fail");
             goto error;
         }
-    }
-    else
-    {
-        ALOGI("func is null");
+    } else {
+        ALOGE("func is null");
     }
 
 error:
@@ -896,8 +871,7 @@ static int aml_start_cpu_before_cmd(int fd)
     }
     ALOGD("success");
     err = aml_start_cpu_uart(fd, aml_set_bdaddr); //aml_hci_reset);
-    if (err < 0)
-    {
+    if (err < 0) {
         ALOGE("aml_start_cpu_uart cmd load fail");
         goto error;
     }
@@ -993,8 +967,7 @@ static int check_download_fwiccm(int fd)
     unsigned char rsp[HCI_MAX_EVENT_SIZE];
 
     BT_fwICCM_len = (int)sizeof(BT_fwICCM);
-    while (iccm_j < BT_fwICCM_len)
-    {
+    while (iccm_j < BT_fwICCM_len) {
         memset(cmd, 0x0, HCI_MAX_CMD_SIZE);
 
         iccm_read_off = iccm_j;
@@ -1037,12 +1010,9 @@ static int check_download_fwiccm(int fd)
 
 
         ALOGI("reg_data = %x,cmp_data = %x", reg_data, cmp_data);
-        if (cmp_data == reg_data)
-        {
+        if (cmp_data == reg_data) {
             ALOGI("read iccm OK");
-        }
-        else
-        {
+        } else {
             ALOGE("read iccm Fail");
             return -1;
         }
@@ -1072,8 +1042,7 @@ static int check_download_dccmfw(int fd)
     unsigned char rsp[HCI_MAX_EVENT_SIZE];
 
     BT_fwDCCM_len = (int)sizeof(BT_fwDCCM);
-    while (dccm_j < BT_fwDCCM_len)
-    {
+    while (dccm_j < BT_fwDCCM_len) {
         memset(cmd, 0x0, HCI_MAX_CMD_SIZE);
 
         dccm_read_off = dccm_j;
@@ -1117,12 +1086,9 @@ static int check_download_dccmfw(int fd)
 
 
         ALOGI("reg_data = %x,cmp_data = %x", reg_data, cmp_data);
-        if (cmp_data == reg_data)
-        {
+        if (cmp_data == reg_data) {
             //ALOGI("read dccm OK");
-        }
-        else
-        {
+        } else {
             ALOGE("read dccm Fail");
             return -1;
         }
@@ -1151,23 +1117,18 @@ static int aml_send(int fd, char *buf, unsigned int buf_size, unsigned int offse
     int n = 0;
     char * cmd_hdr = NULL;
 
-    if (buf == NULL)
-    {
+    if (buf == NULL) {
         ALOGE("buf is NULL");
         return -1;
     }
 
-    if (!diff)
-    {
+    if (!diff) {
         ALOGI("start download fw BT_fwICCM 0x%x  %d", buf_size, n);
-    }
-    else
-    {
+    } else {
         ALOGI("start download fw BT_fwDCCM 0x%x  %d", buf_size, n);
     }
 
-    while (buf_size > 0)
-    {
+    while (buf_size > 0) {
         unsigned int cmd_size = 0;
         unsigned int data_len = 0;
         unsigned int cmd_len = 0;
@@ -1184,20 +1145,17 @@ static int aml_send(int fd, char *buf, unsigned int buf_size, unsigned int offse
 
         /* parameter length */
         *cmd_hdr++ = cmd_len;
-        if (!diff)
-        {
+        if (!diff) {
             UINT32_TO_STREAM(cmd_hdr, ICCM_RAM_BASE + offset);
             n++;
         }
 
-        if (diff)
-        {
+        if (diff) {
             UINT32_TO_STREAM(cmd_hdr, DCCM_RAM_BASE + offset);
             n++;
         }
 
-        for (i = 0; i < data_len; i++)
-        {
+        for (i = 0; i < data_len; i++) {
             cmd_hdr[i] = *(buf + offset + i);
         }
 
@@ -1226,19 +1184,14 @@ static int aml_send(int fd, char *buf, unsigned int buf_size, unsigned int offse
         buf_size -= data_len;
     }
 
-    if (!diff)
-    {
+    if (!diff) {
         ALOGI("download fw BT_fwICCM SUCCESS times: %d", n);
-    }
-    else
-    {
+    } else {
         ALOGI("download fw BT_fwDCCM SUCCESS times: %d", n);
     }
 
-
 error:
     return err;
-
 }
 
 /*******************************************************************************
@@ -1281,8 +1234,7 @@ static unsigned int hw_config_get_iccm_size(char * file)
     if ((fd = open(file, O_RDONLY)) < 0)
         return 0;
     size = read(fd, &iccm_size, 4);
-    if (size < 0)
-    {
+    if (size < 0) {
         ALOGE("--------- read error!---------");
         close(fd);
         return 0;
@@ -1302,19 +1254,16 @@ static unsigned int hw_config_get_dccm_size(char * file)
     if ((fd = open(file, O_RDONLY)) < 0)
         return 0;
 
-    if (lseek(fd, 4, SEEK_SET) != 4)
-    {
+    if (lseek(fd, 4, SEEK_SET) != 4) {
         ALOGE("skip 4 bytes iccm len fail");
         close(fd);
         return 0;
     }
 
     //W1U skip 15KB additional iccm
-    if (aml_mod_idx == W1U_UART)
-    {
+    if (aml_mod_idx == W1U_UART) {
         size = read(fd, &add_iccm, 4);
-        if (size < 0)
-        {
+        if (size < 0) {
             ALOGE("hw_config_get_dccm_size read error!---------");
             close(fd);
             return 0;
@@ -1323,18 +1272,15 @@ static unsigned int hw_config_get_dccm_size(char * file)
     }
 
     size = read(fd, &dccm_size, 4);
-    if (size < 0)
-    {
+    if (size < 0) {
         ALOGE("--------- read error!---------");
         close(fd);
         return 0;
     }
     close(fd);
 
-    if (aml_mod_idx == W1U_UART)
-    {
-        if (dccm_size == W1U_ROM_START_CODE)
-        {
+    if (aml_mod_idx == W1U_UART) {
+        if (dccm_size == W1U_ROM_START_CODE) {
             ALOGE("---------w1u sram code size 0---------");
             dccm_size = add_iccm;
             add_iccm = 0;
@@ -1353,8 +1299,7 @@ static int get_iccmbuf_dccmbuf(char **iccmbuf, char** dccmbuf, unsigned int iccm
     char *p_iccmbuf = malloc(iccmlen + 1);
     char *p_dccmbuf;
 
-    if (p_iccmbuf == NULL)
-    {
+    if (p_iccmbuf == NULL) {
         ALOGE("malloc p_iccmbuf fail");
         ret = 1;
         goto error;
@@ -1362,8 +1307,7 @@ static int get_iccmbuf_dccmbuf(char **iccmbuf, char** dccmbuf, unsigned int iccm
     memset(p_iccmbuf, 0, iccmlen + 1);
 
     p_dccmbuf = malloc(dccmlen + 1);
-    if (p_dccmbuf == NULL)
-    {
+    if (p_dccmbuf == NULL) {
         ALOGE("malloc p_dccmbuf fail");
         ret = 2;
         goto error;
@@ -1371,29 +1315,23 @@ static int get_iccmbuf_dccmbuf(char **iccmbuf, char** dccmbuf, unsigned int iccm
     memset(p_dccmbuf, 0, dccmlen + 1);
 
     fd = open(file, O_RDONLY);
-    if (fd <0)
-    {
+    if (fd <0) {
         ALOGE("open fw_file fail");
         ret = 3;
         goto error;
     }
 
-    if (add_iccm)
-    {
+    if (add_iccm) {
         ALOGI("add iccm size %d",add_iccm);
-        if (lseek(fd, 12, SEEK_SET) != 12)
-        {
+        if (lseek(fd, 12, SEEK_SET) != 12) {
             ALOGE("skip 12byte len fail");
             close(fd);
             ret = 3;
             goto error;
        }
-    }
-    else
-    {
+    } else {
         ALOGI("add iccm size 0");
-        if (lseek(fd, 8, SEEK_SET) != 8)
-        {
+        if (lseek(fd, 8, SEEK_SET) != 8) {
             ALOGE("skip 8byte len fail");
             close(fd);
             ret = 3;
@@ -1402,8 +1340,7 @@ static int get_iccmbuf_dccmbuf(char **iccmbuf, char** dccmbuf, unsigned int iccm
     }
 
     ret = read(fd, p_iccmbuf, iccmlen);
-    if (ret < 0)
-    {
+    if (ret < 0) {
         ALOGE("------ p_iccmbuf read error!------");
         close(fd);
         ret = 3;
@@ -1411,12 +1348,10 @@ static int get_iccmbuf_dccmbuf(char **iccmbuf, char** dccmbuf, unsigned int iccm
     }
 
     //W1U skip 15KB additional iccm
-    if (add_iccm)
-    {
+    if (add_iccm) {
         ALOGI("w1u skip %d additional iccm", add_iccm);
         ret = lseek(fd, add_iccm, SEEK_CUR);
-        if (ret < 0)
-        {
+        if (ret < 0) {
             ALOGE("lseek add iccm fail:%s", strerror(errno));
             close(fd);
             ret = 3;
@@ -1426,8 +1361,7 @@ static int get_iccmbuf_dccmbuf(char **iccmbuf, char** dccmbuf, unsigned int iccm
     }
 
     ret = read(fd, p_dccmbuf, dccmlen);
-    if (ret < 0)
-    {
+    if (ret < 0) {
         ALOGE("------ p_dccmbuf read error!------");
         close(fd);
         ret = 3;
@@ -1440,16 +1374,11 @@ static int get_iccmbuf_dccmbuf(char **iccmbuf, char** dccmbuf, unsigned int iccm
     return 0;
 
 error:
-    if (ret == 1)
-    {
+    if (ret == 1) {
         //do nothing
-    }
-    else if (ret == 2)
-    {
+    } else if (ret == 2) {
         free(p_iccmbuf);
-    }
-    else if (ret ==3)
-    {
+    } else if (ret ==3) {
         free(p_iccmbuf);
         free(p_dccmbuf);
     }
@@ -1493,46 +1422,38 @@ static int aml_download_fw_file(int fd, callback func)
     }
 
     err = aml_send(fd, p_BT_fwICCM, fwICCM_size, fwICCM_offset, fwICCM);
-    if (err < 0)
-    {
+    if (err < 0) {
         ALOGE("write BT_fwICCM fail");
         goto error;
     }
 #if CHECK_FW
     ALOGI("start check BT_fwICCM");
     err = check_download_fwiccm(fd);
-    if (err < 0)
-    {
+    if (err < 0) {
         ALOGE("check_download_fwiccm fail");
     }
 #endif
 
     err = aml_send(fd, p_BT_fwDCCM, fwDCCM_size, fwDCCM_offset, fwDCCM);
-    if (err < 0)
-    {
+    if (err < 0) {
         ALOGE("write BT_fwDCCM fail");
         goto error;
     }
 #if CHECK_FW
     ALOGI("start check BT_fwDCCM");
     err = check_download_dccmfw(fd);
-    if (err < 0)
-    {
+    if (err < 0) {
         ALOGE("check_download_dccmfw fail");
     }
 #endif
 
-    if (func != NULL)
-    {
+    if (func != NULL) {
         err = func(fd);
-        if (err < 0)
-        {
+        if (err < 0) {
             ALOGE("cmd fail");
             err = -1;
         }
-    }
-    else
-    {
+    } else {
         ALOGE("func is NULL");
         err = -1;
     }
@@ -1621,32 +1542,24 @@ static int aml_update_baudrate(int fd, callback tci_write, callback tci_read)
 
     ALOGD("success");
 
-    if (tci_write != NULL)
-    {
+    if (tci_write != NULL) {
         err = tci_write(fd);
-        if (err < 0)
-        {
+        if (err < 0) {
             ALOGE("tci_write cmd fail");
             goto error;
         }
-    }
-    else
-    {
+    } else {
         ALOGE("tci_write is NULL");
         return -1;
     }
 
-    if (tci_read != NULL)
-    {
+    if (tci_read != NULL) {
         err = tci_read(fd);
-        if (err < 0)
-        {
+        if (err < 0) {
             ALOGE("tci_read cmd fail");
             goto error;
         }
-    }
-    else
-    {
+    } else {
         ALOGE("tci_read is NULL");
         return -1;
     }
@@ -1730,7 +1643,7 @@ static int aml_tci_write_reg(int fd)
     /* Wait for command complete event */
     err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
     if ( err < 0) {
-        ALOGI("Failed to set patch info on Controller");
+        ALOGE("Failed to set patch info on Controller");
         goto error;
     }
     if (rsp[4] != cmd[1] || rsp[5] != cmd[2] || rsp[6] != 0X00) {
