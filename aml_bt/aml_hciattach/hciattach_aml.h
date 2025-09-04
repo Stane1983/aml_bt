@@ -51,9 +51,6 @@ extern "C" {
 #define DELIM " =\n\t\r"
 #define MAX_LINE_LEN 255
 
-/* DEFAULT BT MAC */
-#define NUIFYKEY_MAC "/sys/module/kernel/parameters/btmac"
-
 #define W1U_ROM_START_CODE                      0x0cc0006f
 #define BT_DEVICE_PATH   "/dev/stpbt"
 
@@ -87,10 +84,11 @@ typedef struct {
     action_act p_action;
 } d_entry_t;
 
-int aml_woble_configure(int fd);
+int amlbt_set_woble_cfg(int fd);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* HCIATTCH_AML_H */
+

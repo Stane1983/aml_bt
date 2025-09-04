@@ -77,6 +77,7 @@ typedef  enum {
     op_set_power_type,
     op_mailbox_mod_name,
     op_amlbt_drv_insmod,
+    op_steps_max,
 }op_steps;
 
 #define MOD_NAME_MAX_LEN      32
@@ -187,10 +188,12 @@ typedef enum {
 void set_dbg_flag(int val);
 char* get_bt_name(void);
 bool distinguish_bt_module(void);
-void steps_table_poll(void);
+void amlbt_drv_rmmod(void);
+int steps_table_poll(void);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* AML_MULTIBT_H */
+

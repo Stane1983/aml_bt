@@ -76,10 +76,10 @@ typedef struct {
 #define AMP_DEV     0x0002
 #define ENABLE_PM   1
 #define DISABLE_PM  0
-static int serial_fd;
 static struct uart_t *u = NULL;
 int g_usb_fd = -1;
 static bool usb_mod_flag = false;
+static bool stop_flag = false;
 
 static volatile sig_atomic_t __io_canceled = 0;
 
@@ -97,6 +97,13 @@ static void sig_alarm(int sig)
 {
     fprintf(stderr, "Initialization timed out.\n");
     exit(1);
+}
+
+static void amlbt_sig_usr(int sig)
+{
+    ALOGD("SIGUSR1");
+    stop_flag = true;
+    __io_canceled = 1;
 }
 
 static int tty_get_speed(int s)
@@ -244,33 +251,36 @@ const iface_info amlbt_iface[] = {
     { NULL, 0 }
 };
 
-static struct uart_t *amlbt_get_init_cfg(void)
+static int amlbt_get_init_cfg(struct uart_t **dev)
 {
     int i, j;
     const char *bt_name = get_bt_name();
 
-    if (!bt_name)
-        return NULL;
+    if (!bt_name) {
+        ALOGE("NULL bt_name");
+        return -1;
+    }
 
     for (i = 0; amlbt_iface[i].dev_name; i++) {
         if (strcmp(bt_name, amlbt_iface[i].dev_name) != 0)
             continue;
 
-        for (j = 0; uart[j].type; j++) {
-            if (strcmp(amlbt_iface[i].type, uart[j].type) == 0) {
-                return &uart[j];
-            }
-        }
-
         if (strcmp(amlbt_iface[i].type, "aml_usb") == 0) {
             usb_mod_flag = true;
-            break;
+            return 0;
+        }
+
+        for (j = 0; uart[j].type; j++) {
+            if (strcmp(amlbt_iface[i].type, uart[j].type) == 0) {
+                *dev = &uart[j];
+                return 0;
+            }
         }
     }
 
-    return NULL;
+    ALOGE("fail");
+    return -1;
 }
-
 
 static struct uart_t * get_by_id(int m_id, int p_id)
 {
@@ -511,8 +521,11 @@ int main(int argc, char *argv[])
         }
     }
 
-    steps_table_poll();
-    u = amlbt_get_init_cfg();
+    if (steps_table_poll() != 0)
+         exit(1);
+
+    if (amlbt_get_init_cfg(&u) != 0)
+         exit(1);
 
     if (usb_mod_flag) {
         if (strcmp(dev, "/dev/aml_btusb")!= 0) {
@@ -535,7 +548,7 @@ int main(int argc, char *argv[])
         }
     } else {
         if (!u) {
-            fprintf(stderr, "Unknown device type or id\n");
+            ALOGE("Unknown amlbt uart dev type or id");
             exit(1);
         }
 
@@ -553,13 +566,12 @@ int main(int argc, char *argv[])
         alarm(to);
 
         n = init_uart(u->dev, u, send_break, raw);
-        serial_fd = n;
         if (n < 0) {
             perror("Can't initialize device");
             exit(1);
         }
 
-        printf("Device setup complete\n");
+        ALOGD("amlbt uart dev setup complete");
 
         alarm(0);
 
@@ -576,17 +588,21 @@ int main(int argc, char *argv[])
         sa.sa_handler = sig_hup;
         sigaction(SIGHUP, &sa, NULL);
 
-        printf("Device setup complete\n");
+        sa.sa_handler = amlbt_sig_usr;
+        sigaction(SIGUSR1, &sa, NULL);
+
         if (detach) {
             if ((pid = fork())) {
+                ALOGD("fork child process pid:%d", pid);
                 if (printpid)
                     printf("%d\n", pid);
                 return 0;
             }
-
+#if 0
             for (i = 0; i < 20; i++)
                 if (i != n)
                     close(i);
+#endif
         }
 
         p.fd = n;
@@ -598,6 +614,7 @@ int main(int argc, char *argv[])
         sigdelset(&sigs, SIGTERM);
         sigdelset(&sigs, SIGINT);
         sigdelset(&sigs, SIGHUP);
+        sigdelset(&sigs, SIGUSR1);
 
         while (!__io_canceled) {
             p.revents = 0;
@@ -611,15 +628,23 @@ int main(int argc, char *argv[])
         /* Restore TTY line discipline */
         ld = N_TTY;
         if (ioctl(n, TIOCSETD, &ld) < 0) {
+            ALOGE("Can't restore line discipline");
             perror("Can't restore line discipline");
+            close(n);
             exit(1);
         }
 
-        if (!strcmp(u->type, "aml"))
-            aml_woble_configure(n);
+        if (!stop_flag) {
+            if (u->type && !strcmp(u->type, "aml"))
+                amlbt_set_woble_cfg(n);
+        } else {
+            amlbt_drv_rmmod();
+        }
+
+        close(n);
     }
 
-    printf("hciattatch quit\n");
+    ALOGD("quit");
     return 0;
 }
 

@@ -22,6 +22,10 @@
 extern "C" {
 #endif
 
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#endif
+
 /*
  * LINUX_PUBLIC: default yocto STB/TV
  * AUDIO_PROJECT: audio buildroot/yocto
@@ -30,6 +34,20 @@ extern "C" {
 #if !defined(ROKU_PROJECT) && !defined(AUDIO_PROJECT)
 #define LINUX_PUBLIC
 #endif
+
+#define BT_MAC_LEN          6
+#define BT_MAC_BUF_LEN      17
+
+#ifdef ROKU_PROJECT
+#define SAVE_MAC          "/nvram/bt_mac"
+#define PCEDIT_MAC        "/tmp/bdaddr"
+#define FW_VER_FILE       "/tmp/bt_fw_version"
+#else
+#define AMLBT_ADDR_PATH   "/etc/bluetooth/aml/bt_addr"
+#define FW_VER_FILE       "/etc/bluetooth/aml/bt_fw_version"
+#endif
+
+#define AMLBT_RANDOM_DEV "/dev/urandom"
 
 /* aml bt module index */
 enum amlbt_idx{
@@ -52,14 +70,23 @@ typedef struct {
     char *fw_file;
 } vnd_module_t;
 
+enum addr_mode {
+    ADDR_FIXED_PREFIX,   // fixed prefix + random suffix
+    ADDR_FULL_RANDOM     // fully random address
+};
+
 extern unsigned int aml_mod_idx;
 extern const vnd_module_t aml_module[];
 
 void amlbt_get_mod(void);
-void aml_get_fw_version(unsigned char *str);
+void amlbt_get_fw_ver(const char* fpath, unsigned char *str);
+int amlbt_read_addr(const char* fpath, unsigned char *addr);
+int amlbt_write_file(const char* fpath, const char *str, int len);
+int amlbt_get_random_addr(unsigned char *bdaddr, enum addr_mode mode);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* AML_COMM_H */
+

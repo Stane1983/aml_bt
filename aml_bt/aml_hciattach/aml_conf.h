@@ -37,7 +37,6 @@ extern "C" {
 /* bt fw&config */
 #define AML_BT_PATH       "/lib/firmware/aml"
 #define AML_BT_CFG_FILE   AML_BT_PATH"/aml_bt.conf"
-#define FW_VER_FILE       AML_BT_PATH"/fw_version"
 
 #define AML_A2DP_CFG_FILE          AML_BT_PATH"/a2dp_mode_cfg.txt"
 #define AML_BT_CONFIG_RF_FILE      AML_BT_PATH"/aml_bt_rf.txt"
@@ -51,7 +50,7 @@ extern "C" {
 
 #define MANF_ROW                      16
 #define MANF_COLUMN                   16
-#define LOCAL_BDADDR_PATH_BUFFER_LEN 256
+#define PATH_BUF_MAX_LEN 256
 #define BIT(_n)                 (1 << (_n))
 
 //get aml_bt.conf param
@@ -76,3 +75,4 @@ void amlbt_load_conf();
 #endif
 
 #endif /* AML_CONF_H */
+

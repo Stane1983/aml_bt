@@ -77,3 +77,4 @@ int aml_init(int fd, char *bdaddr);
 #endif
 
 #endif /* HCIATTACH_H */
+

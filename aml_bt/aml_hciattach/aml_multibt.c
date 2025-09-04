@@ -78,7 +78,7 @@
 #define WIFI_DRV_PATH "/lib/modules/*/kernel/amlogic/wifi"
 #define BT_DRV_PATH "/lib/modules/*/kernel/amlogic/bt"
 #else
-#define WIFI_DRV_PATH "/lib/modules/*/kernel/drivers/amlogic/wifi"
+#define WIFI_DRV_PATH "/lib/modules/extramodules"
 #define BT_DRV_PATH "/lib/modules/*/kernel/drivers/amlogic/bt"
 #endif
 
@@ -117,8 +117,8 @@ typedef struct {
 } dev_info_uart;
 
 typedef struct {
-    char mod_name[MOD_NAME_MAX_LEN];
-    char mod_arg[MOD_NAME_MAX_LEN];
+    char *mod_name;
+    char *mod_arg;
 } mod_info;
 
 typedef struct {
@@ -126,7 +126,7 @@ typedef struct {
     mod_info mod[MOD_MAX_NUM];
 } drv_info;
 
-typedef void (*op_cb)(void);
+typedef int (*op_cb)(void);
 
 typedef struct {
     op_steps step;
@@ -136,9 +136,9 @@ typedef struct {
 /******************************************************************************
 **  Function Declaration
 ******************************************************************************/
-bool distinguish_bt_mod(void);
-static void set_power_type(void);
-static void mailbox_mod_name_thread(void);
+static int distinguish_bt_mod(void);
+static int set_power_type(void);
+static int mailbox_mod_name_thread(void);
 static int amlbt_drv_insmod(void);
 static int amlbt_drv_modprobe(void);
 static void clr_bt_power_bit(char power_type);
@@ -159,12 +159,13 @@ static const uart_cfg uart_cfg_h4 =
 };
 
 static const steps_table steps_table_exp[] = {
-    {op_distinguish_bt,         (void *)distinguish_bt_mod},
+    {op_distinguish_bt,         distinguish_bt_mod},
     {op_set_power_type,         set_power_type},
 #ifdef MAILBOX_MOD_NAME
     {op_mailbox_mod_name,       mailbox_mod_name_thread},
 #endif
-    {op_amlbt_drv_insmod,       (void *)amlbt_drv_insmod},
+    {op_amlbt_drv_insmod,       amlbt_drv_insmod},
+    {op_steps_max,              NULL},
 };
 
 static bool dbg_flag = false;
@@ -321,7 +322,7 @@ exit:
     return NULL;
 }
 
-static void mailbox_mod_name_thread(void)
+static int mailbox_mod_name_thread(void)
 {
     pthread_t thread_id;
     int ret;
@@ -329,12 +330,15 @@ static void mailbox_mod_name_thread(void)
     ret = pthread_create(&thread_id, NULL, mailbox_mod_name, NULL);
     if (ret != 0) {
         ALOGE("pthread_create fail: %s", strerror(ret));
+        return -1;
     } else {
         ret = pthread_detach(thread_id);
         if (ret != 0) {
             ALOGE("pthread_detach fail: %s", strerror(ret));
         }
     }
+
+    return 0;
 }
 #endif
 
@@ -378,7 +382,7 @@ static bool matching_dev_id(const dev_info *dev, unsigned int dev_size, const de
 
     for (cnt = 0; cnt < dev_size; cnt++) {
         if ((dev[cnt].mod_id.vid == mod_id->vid) && (dev[cnt].mod_id.pid == mod_id->pid)) {
-            ALOGI("matched vid:%04x, pid:%04x, dev_name:%s, cnt:%u, set property",
+            ALOGI("matched vid:%04x, pid:%04x, dev_name:%s, cnt:%u",
                 dev[cnt].mod_id.vid, dev[cnt].mod_id.pid, dev[cnt].dev_name, cnt);
             set_bt_name(dev[cnt].dev_name);
             ret = true;
@@ -394,7 +398,7 @@ static bool matching_dev_id_uart(unsigned int vid)
     unsigned int cnt;
     bool ret = false;
 
-    for (cnt = 0; cnt < (sizeof(bt_dev_uart) / sizeof(dev_info_uart)); cnt++) {
+    for (cnt = 0; cnt < ARRAY_SIZE(bt_dev_uart); cnt++) {
         if (bt_dev_uart[cnt].vid == vid) {
             ALOGI("matched vid:%04x, dev_name:%s, cnt:%u, set property",bt_dev_uart[cnt].vid,
                 bt_dev_uart[cnt].dev_name, cnt);
@@ -501,29 +505,26 @@ static bool get_power_type(char *power_type)
     }
 
     if (strlen(amlbt_name)) {
-        idx = matching_dev_name(bt_dev_pci, (sizeof(bt_dev_pci) / sizeof(dev_info)),
-            amlbt_name);
+        idx = matching_dev_name(bt_dev_pci, ARRAY_SIZE(bt_dev_pci), amlbt_name);
         if (idx >= 0) {
             *power_type = bt_dev_pci[idx].power_type;
             set_pci_flag(true);
             goto exit;
         }
 
-        idx = matching_dev_name(bt_dev_sdio, (sizeof(bt_dev_sdio) / sizeof(dev_info)),
-            amlbt_name);
+        idx = matching_dev_name(bt_dev_sdio, ARRAY_SIZE(bt_dev_sdio), amlbt_name);
         if (idx >= 0) {
             *power_type = bt_dev_sdio[idx].power_type;
             goto exit;
         }
 
-        idx = matching_dev_name(bt_dev_usb, (sizeof(bt_dev_usb) / sizeof(dev_info)),
-            amlbt_name);
+        idx = matching_dev_name(bt_dev_usb, ARRAY_SIZE(bt_dev_usb), amlbt_name);
         if (idx >= 0) {
             *power_type = bt_dev_usb[idx].power_type;
             goto exit;
         }
 
-        for (idx = 0; idx < ( sizeof(bt_dev_uart) / sizeof(dev_info_uart)); idx++) {
+        for (idx = 0; idx < ARRAY_SIZE(bt_dev_uart); idx++) {
             if (!strcmp(bt_dev_uart[idx].dev_name, amlbt_name)) {
                 *power_type = bt_dev_uart[idx].power_type;
                 goto exit;
@@ -538,21 +539,23 @@ exit:
     return true;
 }
 
-static void set_power_type(void)
+static int set_power_type(void)
 {
     char power_type = '\0';
 
     if (!get_power_type(&power_type)) {
         ALOGE("get power type failed");
-        return;
+        return -1;
     }
 
     if (!write_power_type(&power_type, sizeof(char))) {
         ALOGE("write power type failed");
-        return;
+        return -1;
     }
 
     clr_bt_power_bit(power_type);
+
+    return 0;
 }
 
 static bool find_target_file(const char *path, const char * file)
@@ -670,7 +673,7 @@ static bool distinguish_bt_mod_pci(void)
             }
 
             ALOGD("list vid:0x%04x, pid:0x%04x", mod_id.vid, mod_id.pid);
-            ret = matching_dev_id(bt_dev_pci, (sizeof(bt_dev_pci) / sizeof(dev_info)), &mod_id);
+            ret = matching_dev_id(bt_dev_pci, ARRAY_SIZE(bt_dev_pci), &mod_id);
             if (ret) {
                 goto exit;
             }
@@ -742,7 +745,7 @@ static bool distinguish_bt_mod_sdio(void)
             }
 
             ALOGD("list vid:0x%04x, pid:0x%04x", mod_id.vid, mod_id.pid);
-            ret = matching_dev_id(bt_dev_sdio, (sizeof(bt_dev_sdio) / sizeof(dev_info)), &mod_id);
+            ret = matching_dev_id(bt_dev_sdio, ARRAY_SIZE(bt_dev_sdio), &mod_id);
             if (ret) {
                 goto exit;
             }
@@ -816,7 +819,7 @@ static bool distinguish_bt_mod_usb(void)
             }
 
             ALOGD("list vid:0x%04x, pid:0x%04x", mod_id.vid, mod_id.pid);
-            ret = matching_dev_id(bt_dev_usb, (sizeof(bt_dev_usb) / sizeof(dev_info)), &mod_id);
+            ret = matching_dev_id(bt_dev_usb, ARRAY_SIZE(bt_dev_usb), &mod_id);
             if (ret) {
                 goto exit;
             }
@@ -1554,36 +1557,33 @@ static bool distinguish_bt_mod_uart(void)
     return ret;
 }
 
-bool distinguish_bt_mod(void)
+static int distinguish_bt_mod(void)
 {
     ALOGD();
 
     if (amlbt_get_name()) {
-        goto exit;
+         return 0;
     }
 
     if (distinguish_bt_mod_pci()) {
-        goto exit;
+        return 0;
     }
 
     if (distinguish_bt_mod_sdio()) {
-        goto exit;
+        return 0;
     }
 
     if (distinguish_bt_mod_usb()) {
-        goto exit;
+        return 0;;
     }
 
 #ifdef DISTINGUISH_BT_MOD_UART
     if (distinguish_bt_mod_uart()) {
-        goto exit;
+        return 0;
     }
 #endif
 
-    return false;
-
-exit:
-    return  true;
+    return -1;
 }
 
 static int insmod(const char *filename, const char *args)
@@ -1635,9 +1635,9 @@ static int rmmod(const char *name, int flags)
 
     ret = syscall(__NR_delete_module, name, flags);
     if (ret != 0) {
-        ALOGE("remove module %s fail, %s\n", name, strerror(errno));
+        ALOGE("remove module %s fail, %s", name, strerror(errno));
     } else {
-        ALOGD("remove module %s success\n", name);
+        ALOGI("remove module %s success", name);
     }
 
     return ret;
@@ -1648,7 +1648,7 @@ static int amlbt_drv_insmod(void)
     size_t i, j, k;
     int ret;
 
-    for (i = 0; i < sizeof(aml_drv) / sizeof(drv_info); i++) {
+    for (i = 0; i < ARRAY_SIZE(aml_drv); i++) {
         if (strcmp(amlbt_name, aml_drv[i].dev_name) != 0)
             continue;
 
@@ -1707,7 +1707,7 @@ static int amlbt_drv_modprobe(void)
     int i, j;
     char cmd[BUF_MAX_LEN] = {0};
 
-    for (i = 0; i < sizeof(aml_drv)/sizeof(drv_info); i++) {
+    for (i = 0; i < ARRAY_SIZE(aml_drv); i++) {
         if (strcmp(amlbt_name, aml_drv[i].dev_name) != 0) {
             continue;
         }
@@ -1741,14 +1741,37 @@ static int amlbt_drv_modprobe(void)
     return 0;
 }
 
-void steps_table_poll(void)
+void amlbt_drv_rmmod(void)
 {
-    int i = 0;
+    size_t i;
+
+    for (i = 0; i < ARRAY_SIZE(aml_drv); i++) {
+        if (strcmp(amlbt_name, aml_drv[i].dev_name) != 0)
+            continue;
+
+        ALOGD("Matched dev_name: %s", aml_drv[i].dev_name);
+
+        if (aml_drv[i].mod[1].mod_name) {
+            rmmod(aml_drv[i].mod[1].mod_name, 0);
+        }
+    }
+}
+
+int steps_table_poll(void)
+{
+    int ret = -1;
+    int i;
 
     // todo: get steps from conf
 
-    for (i = 0; i < sizeof(steps_table_exp)/sizeof(steps_table); i++) {
-        steps_table_exp[i].tag_ops();
+    for (i = 0; steps_table_exp[i].tag_ops; i++) {
+        ret = steps_table_exp[i].tag_ops();
+        if (ret != 0) {
+            ALOGE("fail");
+            return -1;
+        }
     }
+
+    return 0;
 }
 

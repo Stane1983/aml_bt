@@ -94,3 +94,4 @@ int aml_usb_init(int fd);
 #endif
 
 #endif /* HCIATTACH_AML_USB_H */
+

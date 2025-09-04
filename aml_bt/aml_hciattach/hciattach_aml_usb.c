@@ -50,11 +50,8 @@
 #define UINT8_TO_STREAM(p, u8)   { *(p)++ = (char)(u8); }
 #define UINT16_TO_STREAM(p, u16) { *(p)++ = (char)(u16); *(p)++ = (char)((u16) >> 8); }
 #define CMD_TEST_FW _IOR('A', 2, int)
-#define MAC_LEN 6
+
 #define MAC_DELAY 350
-#define SAVE_MAC "/nvram/bt_mac"
-#define PCEDIT_MAC "/tmp/bdaddr"
-static uint8_t vendor_local_addr[MAC_LEN];
 static int debug = 0;
 extern int g_usb_fd;
 unsigned char *BT_fwICCM = NULL;
@@ -142,13 +139,13 @@ int get_usb_fd(const char *dev)
 {
     int usb_fd = -1;
 
-    ALOGI("The device path passed in is: %s", dev);
+    ALOGD("amlbt usb dev:%s", dev);
     usb_fd = open(dev, O_RDWR | O_NOCTTY);
     if (usb_fd == -1) {
-        ALOGE("Failed to open BT USB Device %s, error: %d", dev, errno);
+        ALOGE("open:%s fail, error:%d", dev, errno);
         return -1;
     }
-    ALOGI("BT USB Device %s opened successfully with file descriptor %d", dev, usb_fd);
+    ALOGI("amlbt usb dev:%s open success, usb_fd:%d", dev, usb_fd);
     return usb_fd;
 }
 
@@ -201,7 +198,7 @@ static int read_event(unsigned char *buffer)
                 case EVT_TYPE:
                     rx_len = read(g_usb_fd, &buffer[event_cnt], 1);
                     if (rx_len <= 0) {
-                        ALOGE("EVT_TYPE read failed: rx_len %d\n", rx_len);
+                        ALOGE("EVT_TYPE read failed: rx_len %d", rx_len);
                         return -1;
                     }
                     event_cnt += rx_len;
@@ -210,7 +207,7 @@ static int read_event(unsigned char *buffer)
                 case EVT_HEAD:
                     rx_len = read(g_usb_fd, &buffer[event_cnt], 2);
                     if (rx_len <= 0) {
-                        ALOGE("EVT_HEAD read failed: rx_len %d\n", rx_len);
+                        ALOGE("EVT_HEAD read failed: rx_len %d", rx_len);
                         return -1;
                     }
                     event_cnt += rx_len;
@@ -219,7 +216,7 @@ static int read_event(unsigned char *buffer)
                 case EVT_PLAYLOAD:
                     rx_len = read(g_usb_fd, &buffer[event_cnt], event_parameter_len);
                     if (rx_len <= 0) {
-                        ALOGE("EVT_PLAYLOAD read failed: rx_len %d\n", rx_len);
+                        ALOGE("EVT_PLAYLOAD read failed: rx_len %d", rx_len);
                         return -1;
                     }
                     event_cnt += rx_len;
@@ -232,7 +229,7 @@ static int read_event(unsigned char *buffer)
         else if (rval == 0) {
             timeout_cnt++;
             if (timeout_cnt > 150) {
-                ALOGE("Rx event parameter timeout!\n");
+                ALOGE("Rx event parameter timeout");
                 return 0;
             }
         }
@@ -248,27 +245,27 @@ static int read_event(unsigned char *buffer)
 
 static int read_event_with_retry(unsigned char *buffer, int max_retry, int delay_ms)
 {
-    int err = 0;
+    int ret = 0;
     int retry = 0;
 
-    ALOGI("read event with retry max_retry: %d, delay: %d\n",max_retry, delay_ms);
+    ALOGD("max_retry:%d, delay:%d", max_retry, delay_ms);
     while (retry < max_retry) {
         ms_delay(delay_ms);
-        err = read_event(buffer);
-        if (err > 0) {
-            ALOGI("read event success err %d retry: %d\n",err, retry);
+        ret = read_event(buffer);
+        if (ret > 0) {
+            ALOGI("read event success ret:%d retry:%d",ret, retry);
             break;
         } else {
-            ALOGE("read_event failed err: %d\n",err);
+            ALOGE("read_event failed ret:%d",ret);
         }
         retry++;
     }
 
-    if (err <= 0) {
-        ALOGE("read_event_with_retry: failed after %d retries\n", max_retry);
+    if (ret <= 0) {
+        ALOGE("still fail after max_retry:%d", max_retry);
     }
 
-    return err;
+    return ret;
 }
 
 
@@ -281,17 +278,17 @@ static int hci_send_cmd(unsigned char *buf, int len)
     if (write_bytes) {
         //write_bytes = write(g_usb_fd, buf + 1, len -1);
         if (debug) {
-            fprintf(stderr, "writing\n");
+            ALOGD("writing");
             dump(buf, len);
 
             if (write_bytes == -1) {
-                ALOGE("Failed to write bytes to uart,error code is[%d]\n",errno);
+                ALOGE("write bytes fail, error:%d",errno);
             }
         }
-         //ALOGI("Send hcicommand success! write_bytes:%d\n",write_bytes);
+         //ALOGI("Send hcicommand success! write_bytes:%d", write_bytes);
         //return 0;
     } else {
-        ALOGE("Send hcicommand failed!\n");
+        ALOGE("send hci command fail");
         return -1;
     }
     return 0;
@@ -472,7 +469,7 @@ static int aml_tci_write_register(int opcode, unsigned int address, unsigned int
     dump(tmp_buff, rx_len);
 
     free(data);
-    ALOGI("TCI_WRITE_READ_SUCCESS success!\n");
+    ALOGI("success");
     return TCI_WRITE_READ_SUCCESS;
 }
 
@@ -572,83 +569,6 @@ static int aml_get_config_params(void)
     return reg_data;
 }
 
-static int aml_get_random(unsigned char *bdaddr)
-{
-    int randomData = open("/dev/random", O_RDONLY);
-    if (randomData < 0) {
-        ALOGE("Failed to open /dev/random");
-        return 1;
-    }
-
-    unsigned char buffer[4];
-    ssize_t bytesRead = read(randomData, buffer, sizeof(buffer));
-    if (bytesRead < 0) {
-        ALOGE("Failed to read from /dev/random");
-        close(randomData);
-        return 1;
-    }
-
-    memcpy(bdaddr + 2, buffer, 4);
-    close(randomData);
-    return 0;
-}
-
-static unsigned char * aml_getprop_read(const char* str)
-{
-    int fd, n;
-    char buf[18];
-
-    memset(buf, '\0', sizeof(buf));
-    ALOGI("opening %s", str);
-    fd = open(str, O_RDONLY|O_CREAT, 0666);
-    if (fd < 0) {
-        ALOGE("open read");
-        goto error;
-    }
-    n = read(fd, buf, sizeof(buf)-1);
-    if (n < sizeof(buf)-1) {
-        ALOGE("n < sizeof(buf)");
-        close(fd);
-        goto error;
-    }
-
-    buf[sizeof(buf)-1] ='\0';
-    close(fd);
-
-    if (strnlen(buf, 17) != 17) {
-        ALOGE("don't matching bt mac");
-        goto error;
-    }
-    sscanf(buf, "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
-                 &vendor_local_addr[0], &vendor_local_addr[1], &vendor_local_addr[2],\
-                 &vendor_local_addr[3], &vendor_local_addr[4], &vendor_local_addr[5]);
-    return vendor_local_addr;
-
-error:
-    return NULL;
-}
-
-static int aml_setprop_write(const char *str, int size)
-{
-    int err = -1;
-    int fd;
-
-    ALOGI("opening %s\n", str);
-    fd = open(SAVE_MAC, O_WRONLY|O_CREAT, 0666);
-    if (fd < 0) {
-        ALOGE("open write");
-        goto error;
-    }
-    err = write(fd, str, size);
-    if (err != size) {
-        ALOGE("write fail");
-    }
-    close(fd);
-
-error:
-    return err;
-}
-
 static int aml_hci_reset(int fd)
 {
     int size, err = 0;
@@ -668,7 +588,7 @@ static int aml_hci_reset(int fd)
     size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE);
 
     /* Send the HCI command packet to UART for transmission */
-    ALOGI("HCI CMD: 0x%x 0x%x 0x%x 0x%x", cmd[0], cmd[1], cmd[2], cmd[3]);
+    ALOGD("HCI CMD: 0x%x 0x%x 0x%x 0x%x", cmd[0], cmd[1], cmd[2], cmd[3]);
 
     unsigned char hcitype[] = {HCI_pduCOMMAND};
     write_bytes = write(fd, hcitype, 1);
@@ -679,9 +599,10 @@ static int aml_hci_reset(int fd)
             goto error;
         }
     } else {
+        ALOGE("hci set hcitype err");
         goto error;
     }
-    ALOGI("Received HCI-Vendor Specific Event from SOC");
+    ALOGD("Received HCI-Vendor Specific Event from SOC");
 
     /* Wait for command complete event */
     err = read_event(rsp);
@@ -690,16 +611,16 @@ static int aml_hci_reset(int fd)
         goto error;
     }
 
-    ALOGI("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6]);
+    ALOGD("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6]);
     if (rsp[4] != cmd[1] || rsp[5] != cmd[2] || rsp[6] != 0X00) {
         ALOGE("Failed to tci_write, command failure");
         return -1;
     }
+
     ALOGI("reset success");
     return err;
 
 error:
-    ALOGE("hci reset error");
     return err;
 }
 
@@ -786,6 +707,7 @@ static int aml_set_wakeup_param_roku(int fd)
             goto error;
         }
     } else {
+        ALOGE("hci set hcitype err");
         goto error;
     }
 
@@ -794,13 +716,12 @@ static int aml_set_wakeup_param_roku(int fd)
         ALOGE("Failed to set apcf config on Controller");
         goto error;
     }
-    ALOGI("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6]);
+    ALOGD("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6]);
     ALOGI("hci set roku apcf success %d",err);
     return err;
 
 error:
     return err;
-    ALOGE("hci set apcf error");
 }
 
 static int aml_set_wakeup_param_w1u(int fd)
@@ -819,35 +740,35 @@ static int aml_set_wakeup_param_w1u(int fd)
 
     ALOGI("set wake w1u_manf_data");
     if (amlbt_manf_para == 0) {
-        ALOGI("amlbt_manf_para is 0, use default");
+        ALOGD("amlbt_manf_para is 0, use default");
         ALOGI("set wake default_manf_data");
         //err = aml_hci_send_cmd(fd, (unsigned char *)default_manf_data,
             //sizeof(default_manf_data),(unsigned char *)rsp, HCI_MAX_EVENT_SIZE);
         return 0;
     }
 
-    total_manf_data = malloc(LOCAL_BDADDR_PATH_BUFFER_LEN);
+    total_manf_data = malloc(PATH_BUF_MAX_LEN);
     if (!total_manf_data) {
         ALOGE("Memory alloc failed!");
         return -ENOMEM;
     }
-    memset(total_manf_data, 0, LOCAL_BDADDR_PATH_BUFFER_LEN);
+    memset(total_manf_data, 0, PATH_BUF_MAX_LEN);
 
     while (cnt < MANF_ROW) {
         //15 index->0/1/2/3
         if ((BIT(cnt) & amlbt_manf_para) != 0) {
             int group_len = w1u_manf_data[cnt][0] + 1;//param length + payload = 1 + 9
-            if ((total_len + group_len) > LOCAL_BDADDR_PATH_BUFFER_LEN) {
+            if ((total_len + group_len) > PATH_BUF_MAX_LEN) {
                 ALOGE("APCF buffer overflow!");
                 break;
             } else {
                 memcpy(&total_manf_data[total_len], w1u_manf_data[cnt], group_len);
-                ALOGI("%#x %#x %#x %#x %#x %#x %#x %#x", total_manf_data[total_len], total_manf_data[total_len+1],
+                ALOGD("%#x %#x %#x %#x %#x %#x %#x %#x", total_manf_data[total_len], total_manf_data[total_len+1],
                         total_manf_data[total_len+2], total_manf_data[total_len+3],
                         total_manf_data[total_len+4], total_manf_data[total_len+5],
                         total_manf_data[total_len+6], total_manf_data[total_len+7]);
                 total_len += group_len;
-                ALOGI("%#x %#x %#x %#x %#x %#x %#x %#x", w1u_manf_data[cnt][0], w1u_manf_data[cnt][1],
+                ALOGD("%#x %#x %#x %#x %#x %#x %#x %#x", w1u_manf_data[cnt][0], w1u_manf_data[cnt][1],
                         w1u_manf_data[cnt][2], w1u_manf_data[cnt][3],
                         w1u_manf_data[cnt][4], w1u_manf_data[cnt][5],
                         w1u_manf_data[cnt][6], w1u_manf_data[cnt][7]);
@@ -882,6 +803,7 @@ static int aml_set_wakeup_param_w1u(int fd)
             goto error;
         }
     } else {
+        ALOGE("hci set hcitype err");
         goto error;
     }
 
@@ -890,7 +812,7 @@ static int aml_set_wakeup_param_w1u(int fd)
         ALOGE("Failed to set w1u_manf_data config on Controller");
         goto error;
     }
-    ALOGI("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x",rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5]);
+    ALOGD("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x",rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5]);
     ALOGI("hci set w1u_manf_data success %d", err);
 
     free(total_manf_data);
@@ -898,7 +820,6 @@ static int aml_set_wakeup_param_w1u(int fd)
 
 error:
     return err;
-    ALOGE("hci set w1u_manf_data error");
 }
 
 static int aml_set_wakeup_param_public(int fd)
@@ -930,7 +851,8 @@ static int aml_set_wakeup_param_public(int fd)
     *cmd_hdr++ = APCF_config_manf_data[8];
 
     size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE + 5);
-    ALOGI("HCI CMD: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x", cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8]);
+    ALOGD("HCI CMD: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x",
+        cmd[0], cmd[1], cmd[2], cmd[3], cmd[4], cmd[5], cmd[6], cmd[7], cmd[8]);
 
     unsigned char hcitype[] = {HCI_pduCOMMAND};
     write_bytes = write(fd, hcitype, 1);
@@ -942,6 +864,7 @@ static int aml_set_wakeup_param_public(int fd)
             goto error;
         }
     } else {
+        ALOGE("hci set hcitype err");
         goto error;
     }
 
@@ -950,14 +873,13 @@ static int aml_set_wakeup_param_public(int fd)
         ALOGE("Failed to set ManfData_public config on Controller");
         goto error;
     }
-    ALOGI("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5]);
-    ALOGI("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x", rsp[6], rsp[7], rsp[8], rsp[9], rsp[10], rsp[11]);
-    ALOGI("hci set ManfData_public success %d", err);
+    ALOGD("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5]);
+    ALOGD("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x", rsp[6], rsp[7], rsp[8], rsp[9], rsp[10], rsp[11]);
+    ALOGI("hci set ManfData_public success");
     return err;
 
 error:
     return err;
-    ALOGE("hci set ManfData_public error");
 }
 
 #if 0
@@ -1127,44 +1049,49 @@ static int aml_set_bdaddr(int fd)
     unsigned char rsp[HCI_MAX_EVENT_SIZE];
     char *cmd_hdr = NULL;
     int write_bytes = 0;
-    char buf[18];
-    unsigned char *tempbuf;
-    unsigned char local_addr[MAC_LEN];
+    char buf[BT_MAC_BUF_LEN + 1];
+    unsigned char local_addr[BT_MAC_LEN];
 
-    if ((tempbuf = aml_getprop_read(PCEDIT_MAC)) != NULL) {
-        memcpy(local_addr, tempbuf, MAC_LEN);
-        goto set_mac;
-    }
-    /*
-    else if (aml_check_efuse_bdaddr(fd) > 0 ) {
+    /* if (aml_check_efuse_bdaddr(fd) > 0 ) {
         ALOGI("use mac in efuse");
         memset(local_addr, 0, MAC_LEN);
         goto set_mac;
-    }*/
-    else if ((tempbuf = aml_getprop_read(SAVE_MAC)) != NULL) {
-        memcpy(local_addr, tempbuf, MAC_LEN);
+    } else */
+#ifdef ROKU_PROJECT
+     if (!amlbt_read_addr(PCEDIT_MAC, local_addr)) {
+        ALOGD("%s read bdaddr ok", PCEDIT_MAC);
+        goto set_mac;
+    } else if (!amlbt_read_addr(SAVE_MAC, local_addr)) {
+        ALOGD("%s read bdaddr ok", SAVE_MAC);
         goto set_mac;
     }
+#else
+    if (!amlbt_read_addr(AMLBT_ADDR_PATH, local_addr)) {
+        ALOGD("%s read bdaddr ok", AMLBT_ADDR_PATH);
+        goto set_mac;
+    }
+#endif
 
-    memset(buf, '\0', sizeof(buf));
-    memset(local_addr, '\0', MAC_LEN);
-
-    local_addr[0] = 0x22;
-    local_addr[1] = 0x22;
-    /*get random number from /dev/random, if succeed save it to file*/
-    if (!aml_get_random(local_addr)) {
-        sprintf(buf, "%02x:%02x:%02x:%02x:%02x:%02x",local_addr[0],local_addr[1], local_addr[2], local_addr[3], local_addr[4], local_addr[5]);
-        ret = aml_setprop_write(buf, sizeof(buf));
+    if (!amlbt_get_random_addr(local_addr, ADDR_FIXED_PREFIX)) {
+        snprintf(buf, sizeof(buf), "%02x:%02x:%02x:%02x:%02x:%02x",
+            local_addr[0], local_addr[1], local_addr[2],
+            local_addr[3], local_addr[4], local_addr[5]);
+#ifdef ROKU_PROJECT
+         ret = amlbt_write_file(SAVE_MAC, buf, sizeof(buf));
+#else
+         ret = amlbt_write_file(AMLBT_ADDR_PATH, buf, sizeof(buf));
+#endif
         if (ret < 0) {
-            ALOGE("aml_getprop_write fail");
+            ALOGE("amlbt_write_file fail");
         }
     } else {
-        ALOGE("Failed to get random mac addr");
+        ALOGE("get random mac addr fail");
         goto error;
     }
 
 set_mac:
-    ALOGI("set bdaddr: %02x:%02x:%02x:%02x:%02x:%02x", local_addr[0],local_addr[1], local_addr[2], local_addr[3], local_addr[4], local_addr[5]);
+    ALOGI("set bdaddr: %02X:%02X:%02X:%02X:%02X:%02X",
+        local_addr[0],local_addr[1], local_addr[2], local_addr[3], local_addr[4], local_addr[5]);
 
     memset(cmd, 0x0, HCI_MAX_CMD_SIZE);
     memset(rsp, 0x0, HCI_MAX_EVENT_SIZE);
@@ -1172,7 +1099,7 @@ set_mac:
     cmd_hdr = (void *) (cmd + 1);
     cmd[0]    = HCI_COMMAND_PKT;
     UINT16_TO_STREAM(cmd_hdr, HCI_VSC_WRITE_BD_ADDR);
-    *cmd_hdr++ = MAC_LEN;
+    *cmd_hdr++ = BT_MAC_LEN;
     *cmd_hdr++ = local_addr[5];
     *cmd_hdr++ = local_addr[4];
     *cmd_hdr++ = local_addr[3];
@@ -1180,9 +1107,9 @@ set_mac:
     *cmd_hdr++ = local_addr[1];
     *cmd_hdr++ = local_addr[0];
 
-    size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE + MAC_LEN);
+    size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE + BT_MAC_LEN);
     /* Send the HCI command packet to UART for transmission */
-    ALOGI("HCI CMD: 0x%x 0x%x 0x%x 0x%x", cmd[0], cmd[1], cmd[2], cmd[3]);
+    ALOGD("HCI CMD: %#x %#x %#x %#x", cmd[0], cmd[1], cmd[2], cmd[3]);
 
     unsigned char hcitype[] = {HCI_pduCOMMAND};
     write_bytes = write(fd, hcitype, 1);
@@ -1194,6 +1121,7 @@ set_mac:
             goto error;
         }
     } else {
+        ALOGE("hci set hcitype err");
         goto error;
     }
 
@@ -1203,21 +1131,20 @@ set_mac:
         goto error;
     }
 
-    ALOGI("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6]);
-    ALOGI("HCI rsp: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x", rsp[7], rsp[8], rsp[9], rsp[10], rsp[11], rsp[12], rsp[13]);
+    ALOGD("HCI rsp: %#x %#x %#x %#x %#x %#x", rsp[0], rsp[1], rsp[2], rsp[3], rsp[4], rsp[5], rsp[6]);
+    ALOGD("HCI rsp: %#x %#x %#x %#x %#x %#x", rsp[7], rsp[8], rsp[9], rsp[10], rsp[11], rsp[12], rsp[13]);
 
     if (rsp[4] != cmd[1] || rsp[5] != cmd[2] || rsp[6] != 0X00) {
         ALOGE("Failed to set_bdaddr, command failure");
         return -1;
     }
 
-    aml_get_fw_version(rsp);
-    ALOGI("success ret:%d", ret);
+    amlbt_get_fw_ver(FW_VER_FILE, rsp);
+    ALOGD("success ret:%d", ret);
     return ret;
 
 error:
     return ret;
-    ALOGE("hci set bdaddr error");
 }
 
 static int aml_download_firmware(char* firmware_file_path)
@@ -1235,29 +1162,29 @@ static int aml_download_firmware(char* firmware_file_path)
 
     memset(fw_bin_file, 0, sizeof(fw_bin_file));
     if ((binfile_fd = open(firmware_file_path, O_RDONLY)) < 0) {
-        ALOGE("Could not open %s\n", firmware_file_path);
+        ALOGE("open:%s fail", firmware_file_path);
         return err;
     }
     ALOGI("open firmware file success binfile_fd:%d", binfile_fd);
     size = read(binfile_fd, &iccm_size, 4);
-    ALOGI("hw_config_get_iccm_size iccm_size:%d size:%d\n", iccm_size,size);
+    ALOGI("hw_config_get_iccm_size iccm_size:%d size:%d", iccm_size,size);
     if (size < 0) {
         ALOGE("---------1hw_config_get_iccm_size read error!---------");
         close(binfile_fd);
         return err;
     }
-    ALOGI("---------2hw_config_get_iccm_size iccm_size %d---------\n", iccm_size);
+    ALOGI("---------2hw_config_get_iccm_size iccm_size %d---------", iccm_size);
     size = read(binfile_fd, &dccm_size, 4);
     if (size < 0) {
         ALOGE("---------hw_config_get_dccm_size read error!---------");
         close(binfile_fd);
         return err;
     }
-    ALOGI("---------hw_config_get_dccm_size dccm_size %d---------\n", dccm_size);
+    ALOGI("---------hw_config_get_dccm_size dccm_size %d---------", dccm_size);
     BT_fwICCM = (unsigned char*)malloc(iccm_size);
     BT_fwDCCM = (unsigned char*)malloc(dccm_size);
     if ((!BT_fwICCM) ||(!BT_fwDCCM)) {
-        ALOGE("Malloc failed!\n");
+        ALOGE("Malloc fail");
         return err;
     }
     size = read(binfile_fd, BT_fwICCM, iccm_size);
@@ -1320,7 +1247,7 @@ static int aml_download_firmware(char* firmware_file_path)
 */
 int aml_usb_init(int fd)
 {
-    int err = -1;
+    int ret = -1;
 
 #if 0
     err = aml_download_firmware(AML_W1U_BT_FW_USB_FILE);
@@ -1332,45 +1259,45 @@ int aml_usb_init(int fd)
 #endif
 
     ms_delay(MAC_DELAY);
-    ALOGI("delay %d wait cpu start",MAC_DELAY);
+    ALOGD("delay %d ms wait cpu start", MAC_DELAY);
 
     amlbt_get_mod();
 
     /*read conf file*/
     amlbt_load_conf();
 
-    err = aml_set_bdaddr(fd);
-    if (err < 0) {
+    ret = aml_set_bdaddr(fd);
+    if (ret < 0) {
         ALOGE("HCI set bdaddr failed");
         goto error;
     }
-    ALOGI("HCI set bdaddr is done");
+    ALOGD("HCI set bdaddr is done");
 
 #ifdef ROKU_PROJECT
-    err = aml_set_wakeup_param_roku(fd);
+    ret = aml_set_wakeup_param_roku(fd);
 #elif defined(LINUX_PUBLIC)
     if (aml_mod_idx == W1U_USB) {
-        err = aml_set_wakeup_param_w1u(fd);
+        ret = aml_set_wakeup_param_w1u(fd);
     } else {
-        err = aml_set_wakeup_param_public(fd);
+        ret = aml_set_wakeup_param_public(fd);
     }
 #elif defined(AUDIO_PROJECT)
     #warning "AUDIO_PROJECT ignore select APCF config"
 #else
     #error "Please define ROKU_PROJECT/LINUX_PUBLIC to select correct APCF config"
 #endif
-    if (err < 0) {
+    if (ret < 0) {
         ALOGE("HCI set wake manf data failed");
         goto error;
     }
-    ALOGI("HCI set wake manf data is done");
+    ALOGD("HCI set wake manf data is done");
 
-    ALOGI("aml_usb_init success %d",err);
+    ALOGI("aml_usb_init success ret:%d", ret);
     close(fd);
-    return err;
+    return ret;
 
 error:
-    ALOGI("aml_usb_init failed");
     close(fd);
-    return err;
+    return ret;
 }
+

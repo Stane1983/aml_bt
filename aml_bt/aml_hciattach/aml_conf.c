@@ -127,7 +127,7 @@ static int manf_data_split(char *p)
         sscanf(p + i, "%2x", &tmp);
         //ALOGD("%#02x", tmp);
         if (tmp < 0 || tmp > 0xff) {
-            ALOGI("%#02x", tmp);
+            ALOGD("%#02x", tmp);
             return 0;
         }
         APCF_config_manf_data[j++] = *((unsigned char*)&tmp);
@@ -235,7 +235,7 @@ void amlbt_load_conf(void)
 
         char *split = strchr(line_ptr, '=');
         if (!split) {
-            ALOGI("no key/value separator found on line %d.", line_num);
+            ALOGD("no key/value separator found on line %d.", line_num);
             continue;
         }
 
