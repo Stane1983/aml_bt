@@ -8,6 +8,7 @@
 */
 #ifndef __W1U_USB_BT_H__
 #define __W1U_USB_BT_H__
+#ifdef CONFIG_USB
 
 typedef struct
 {
@@ -80,5 +81,5 @@ int amlbt_w1uu_init(void);
 void amlbt_w1uu_exit(void);
 
 #endif
-
+#endif
 

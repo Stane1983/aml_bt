@@ -6,6 +6,8 @@
 *
 * Description:
 */
+#ifdef CONFIG_USB
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -4157,4 +4159,5 @@ void amlbt_w1uu_exit(void)
     platform_driver_unregister(p_driver);
     platform_device_unregister(p_device);
 }
+#endif
 

@@ -281,11 +281,13 @@ int amlbt_write_rclist_to_firmware(void)
     }
     else if (INTF_TYPE_IS_USB(amlbt_if_type))
     {
+#ifdef CONFIG_USB
         if (p_ws_inf == NULL || p_ws_inf == NULL)
         {
             BTE("%s p_ws_inf or p_ws_inf is NULL\n", __func__);
             return -1;
         }
+#endif
     }
     for (i = 0; i < MAX_MAC_LIST; i++)
     {
@@ -314,11 +316,13 @@ int amlbt_write_rclist_to_firmware(void)
     }
     else if (INTF_TYPE_IS_USB(amlbt_if_type))
     {
+#ifdef CONFIG_USB
         ret = p_ws_inf(mac, (unsigned char *)(unsigned long)FIFO_FW_RC_LIST_ADDR, MAC_ADDR_LEN*MAX_MAC_LIST, USB_EP1);
         if (ret != 0)
         {
-            goto err_exit;
+            return ret;
         }
+#endif
     }
     BTF("%s 222\n", __func__);
     memset(mac, 0, sizeof(mac));
@@ -337,11 +341,13 @@ int amlbt_write_rclist_to_firmware(void)
     }
     else if (INTF_TYPE_IS_USB(amlbt_if_type))
     {
+#ifdef CONFIG_USB
         ret = p_rs_inf(mac, (unsigned char *)(unsigned long)FIFO_FW_RC_LIST_ADDR, MAC_ADDR_LEN*MAX_MAC_LIST, USB_EP1);
         if (ret != 0)
         {
-            goto err_exit;
+            return ret;
         }
+#endif
     }
     BTP("%#x\n",mac[0]);
     BTP("%#x\n",mac[1]);
@@ -350,8 +356,6 @@ int amlbt_write_rclist_to_firmware(void)
     BTP("%#x\n",mac[4]);
     BTP("%#x\n",mac[5]);
     BTF("rclist:[%#x,%#x,%#x,%#x,%#x,%#x]\n", mac[0], mac[1], mac[2],mac[3],mac[4],mac[5]);
-    return ret;
-err_exit:
     return ret;
 }
 
@@ -372,11 +376,13 @@ void amlbt_clear_rclist_from_firmware(void)
     }
     else if (INTF_TYPE_IS_USB(amlbt_if_type))
     {
+#ifdef CONFIG_USB
         if (p_ws_inf == NULL || p_ws_inf == NULL)
         {
             BTE("%s p_ws_inf or p_ws_inf is NULL\n", __func__);
             return ;
         }
+#endif
     }
     if (INTF_TYPE_IS_SDIO(amlbt_if_type))
     {
@@ -389,7 +395,9 @@ void amlbt_clear_rclist_from_firmware(void)
     }
     else if (INTF_TYPE_IS_USB(amlbt_if_type))
     {
+#ifdef CONFIG_USB
         p_ws_inf(mac, (unsigned char *)(unsigned long)FIFO_FW_RC_LIST_ADDR, MAC_ADDR_LEN*MAX_MAC_LIST, USB_EP1);
+#endif
     }
     BTF("%s 222\n", __func__);
 }

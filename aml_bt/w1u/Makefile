@@ -24,6 +24,10 @@ $(warning M=$(M))
 ###############################################################################
 # Common
 ###############################################################################
+ifeq ($(CONFIG_USB_CLOSE),)
+EXTRA_CFLAGS += -DCONFIG_USB
+endif
+
 obj-m += $(AMLBT_MOD_NAME).o
 
 EXTRA_CFLAGS += -Wno-pointer-to-int-cast

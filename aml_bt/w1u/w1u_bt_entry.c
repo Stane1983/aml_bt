@@ -62,11 +62,13 @@ static int w1u_bt_init(void)
     }
     else if (INTF_TYPE_IS_USB(amlbt_if_type))
     {
+#ifdef CONFIG_USB
         if (FAMILY_TYPE_IS_W1U(amlbt_if_type))
         {
             BTI("%s w1u usb \n", __func__);
             ret = amlbt_w1uu_init();
         }
+#endif
     }
     else
     {
@@ -91,11 +93,13 @@ static void w1u_bt_exit(void)
     }
     else if (INTF_TYPE_IS_USB(amlbt_if_type))
     {
+#ifdef CONFIG_USB
         if (FAMILY_TYPE_IS_W1U(amlbt_if_type))
         {
             BTI("%s w1u usb \n", __func__);
             amlbt_w1uu_init();
         }
+#endif
     }
     else
     {

@@ -308,9 +308,9 @@ extern unsigned int g_dbg_level;
 extern unsigned int amlbt_if_type;
 extern unsigned int polling_time;
 extern unsigned int amlbt_ft_mode;
-
+#ifdef CONFIG_USB
 extern bt_shutdown_func g_bt_shutdown_func;
-
+#endif
 typedef int (*ws_inf)(unsigned char *buf, unsigned char *sram_addr, unsigned int len, unsigned int ep);
 typedef int (*rs_inf)(unsigned char *buf, unsigned char *sram_addr, unsigned int len, unsigned int ep);
 typedef int (*ww_inf)(unsigned int addr,unsigned int data, unsigned int ep);
