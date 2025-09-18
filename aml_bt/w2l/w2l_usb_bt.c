@@ -3804,8 +3804,8 @@ static ssize_t amlbt_char_read(struct file *file_p,
     }
 }
 
-
 //linux for bluez stack
+#if 0
 static int amlbt_hci_read(unsigned char *buf_p)
 {
     static unsigned int bt_type = 0;
@@ -3967,7 +3967,6 @@ exit:
     return size;
 }
 
-#if 0
 static void amlbt_hci_receive(struct work_struct *work)
 {
     unsigned char buf[1032+64] = {0};
@@ -4110,16 +4109,41 @@ static void amlbt_hci_receive(struct work_struct *work)
 }
 #endif
 
+static int amlbt_report_hardware_error(struct aml_bt_info *info)
+{
+    struct sk_buff *skb;
+    unsigned char hw_error_evt[4] = {0x04, 0x10, 0x01, 0x00};
+
+    BTF("%s\n", __func__);
+    skb = bt_skb_alloc(4, GFP_ATOMIC);
+    if (!skb) {
+        BTE("Failed to allocate SKB for hardware error\n");
+        return -ENOMEM;
+    }
+
+    skb_put_data(skb, hw_error_evt, 4);
+    hci_recv_frame(info->hdev, skb);
+    info->hdev->stat.byte_rx += 4;
+    BTF("hw_error_evt: %#x|%#x|%#x|%#x\n",
+        hw_error_evt[0], hw_error_evt[1], hw_error_evt[2], hw_error_evt[3]);
+    return 0;
+}
+
 static void amlbt_hci_receive(struct work_struct *work)
 {
     struct sk_buff *skb = NULL;
     struct aml_bt_info *info = container_of(to_delayed_work(work), struct aml_bt_info, receive_work);
     w2l_usb_bt_t *p_bt = &amlbt_dev;
-    unsigned long flags;
     bool is_empty;
 
     if (!info || !info->hdev) {
         BTE("Invalid info or hdev\n");
+        return;
+    }
+
+    if (p_bt->dr_state & BT_DRV_STATE_RECOVERY)
+    {
+        amlbt_report_hardware_error(info);
         return;
     }
 
@@ -4138,12 +4162,7 @@ static void amlbt_hci_receive(struct work_struct *work)
     is_empty = skb_queue_empty(&p_bt->bt_rx_queue);
     spin_unlock(&p_bt->bt_rx_queue_lock);
 
-    if (!p_bt->hardware_error) {
-        queue_delayed_work(info->workqueue, &info->receive_work, is_empty ? msecs_to_jiffies(10) : 0);
-    } else {
-        p_bt->hardware_error = 0;
-        BTE("Hardware error cleared\n");
-    }
+    queue_delayed_work(info->workqueue, &info->receive_work, is_empty ? msecs_to_jiffies(10) : 0);
 }
 
 static int amlbt_hci_write(struct sk_buff *skb)

@@ -367,6 +367,7 @@ static int amlbt_input_device_init(struct platform_device *pdev)
     }
     set_bit(EV_KEY,  p_sdio->input_dev->evbit);
     set_bit(KEY_POWER, p_sdio->input_dev->keybit);
+    set_bit(KEY_NETFLIX, p_sdio->input_dev->keybit);
 
     p_sdio->input_dev->name = INPUT_NAME;
     p_sdio->input_dev->phys = INPUT_PHYS;
