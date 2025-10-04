@@ -12,7 +12,6 @@ AMLBT_CFILES := \
     w2_bt_entry.c \
     w2_sdio_bt.c \
     w2_usb_bt.c \
-    w2_pcie_bt.c \
     rc_list.c \
     debug_dev.c \
     common.c
