@@ -1595,7 +1595,7 @@ static int insmod(const char *filename, const char *args)
         return -1;
     }
 
-    fd = TEMP_FAILURE_RETRY(open(filename, O_RDONLY | O_CLOEXEC | O_NOFOLLOW));
+    fd = TEMP_FAILURE_RETRY(open(filename, O_RDONLY | O_CLOEXEC));
     if (fd < 0) {
         ALOGE("Failed to open %s", filename);
         return -1;
