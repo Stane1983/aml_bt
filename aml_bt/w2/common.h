@@ -310,7 +310,7 @@ extern unsigned int g_dbg_level;
 extern unsigned int amlbt_if_type;
 extern unsigned int polling_time;
 extern unsigned int amlbt_ft_mode;
-extern bt_shutdown_func g_bt_shutdown_func;
+//extern bt_shutdown_func g_bt_shutdown_func;
 
 typedef int (*ws_inf)(unsigned char *buf, unsigned char *sram_addr, unsigned int len, unsigned int ep);
 typedef int (*rs_inf)(unsigned char *buf, unsigned char *sram_addr, unsigned int len, unsigned int ep);

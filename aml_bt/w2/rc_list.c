@@ -54,8 +54,8 @@ static wrs_sdio_inf p_rs_sdio_inf = NULL;
 static rc_list_t rc_list[MAX_MAC_LIST] = {0};
 static list_bt_t list_dev = {0};
 
-extern uint32_t aml_pci_read_for_bt(int base, u32 offset);
-extern void aml_pci_write_for_bt(u32 val, int base, u32 offset);
+extern uint32_t w2_aml_pci_read_for_bt(int base, u32 offset);
+extern void w2_aml_pci_write_for_bt(u32 val, int base, u32 offset);
 
 static ssize_t rc_list_read(struct device *dev,
                                     struct device_attribute *attr,
@@ -299,7 +299,7 @@ int amlbt_write_rclist_to_firmware(void)
         while (offset < MAC_ADDR_LEN*MAX_MAC_LIST)
         {
             list_reg = ((24 << mac[offset+3]) | (16 << mac[offset+2]) | (8 << mac[offset+1]) | mac[offset]);
-            aml_pci_write_for_bt(list_reg, AML_ADDR_CPU, FIFO_FW_RC_LIST_ADDR+offset);
+            w2_aml_pci_write_for_bt(list_reg, AML_ADDR_CPU, FIFO_FW_RC_LIST_ADDR+offset);
             offset += 4;
         }
     }
@@ -322,7 +322,7 @@ int amlbt_write_rclist_to_firmware(void)
         offset = 0;
         while (offset < MAC_ADDR_LEN*MAX_MAC_LIST)
         {
-            list_reg = aml_pci_read_for_bt(AML_ADDR_CPU, FIFO_FW_RC_LIST_ADDR+offset);
+            list_reg = w2_aml_pci_read_for_bt(AML_ADDR_CPU, FIFO_FW_RC_LIST_ADDR+offset);
             mac[offset] = (list_reg & 0xff);
             mac[offset+1] = ((list_reg >> 8) & 0xff);
             mac[offset+2] = ((list_reg >> 16) & 0xff);
@@ -366,7 +366,7 @@ void amlbt_clear_rclist_from_firmware(void)
         while (offset < MAC_ADDR_LEN*MAX_MAC_LIST)
         {
             list_reg = ((24 << mac[offset+3]) | (16 << mac[offset+2]) | (8 << mac[offset+1]) | mac[offset]);
-            aml_pci_write_for_bt(list_reg, AML_ADDR_CPU, FIFO_FW_RC_LIST_ADDR+offset);
+            w2_aml_pci_write_for_bt(list_reg, AML_ADDR_CPU, FIFO_FW_RC_LIST_ADDR+offset);
             offset += 4;
         }
     }

@@ -127,13 +127,13 @@
 #define PMU_WAKE_WAIT     0xa
 #define PMU_WAKE_XOSC     0xb
 
-extern struct aml_hif_sdio_ops g_hif_sdio_ops;
-extern struct aml_pm_type g_wifi_pm;
-extern void aml_sdio_exit(void);
-extern int  aml_sdio_init(void);
-extern void aml_bus_state_detect_deinit(void);
-extern unsigned char g_sdio_driver_insmoded;
-extern struct sdio_func *aml_priv_to_func(int func_n);
+extern struct aml_hif_sdio_ops w2_g_hif_sdio_ops;
+extern struct aml_pm_type w2_g_wifi_pm;
+extern void w2_aml_sdio_exit(void);
+extern int  w2_aml_sdio_init(void);
+extern void w2_aml_bus_state_detect_deinit(void);
+extern unsigned char w2_g_sdio_driver_insmoded;
+extern struct sdio_func *w2_aml_priv_to_func(int func_n);
 #ifdef CONFIG_AMLOGIC_GX_SUSPEND
 extern unsigned int get_resume_method(void);
 #endif
@@ -208,16 +208,16 @@ static int amlbt_bind_bus(void)
 {
     w2_sdio_bt_t *p_sdio = &sdio_bt;
 
-    if (aml_priv_to_func(7) == NULL)
+    if (w2_aml_priv_to_func(7) == NULL)
     {
-        BTE("aml_priv_to_func(7) is NULL");
+        BTE("w2_aml_priv_to_func(7) is NULL");
         return -ENOMEM;
     }
     else
     {
         if (p_sdio->link == NULL)
         {
-            p_sdio->link = device_link_add(&amlbt_sdio_device.dev, &aml_priv_to_func(7)->dev, DL_FLAG_PM_RUNTIME | DL_FLAG_STATELESS);
+            p_sdio->link = device_link_add(&amlbt_sdio_device.dev, &w2_aml_priv_to_func(7)->dev, DL_FLAG_PM_RUNTIME | DL_FLAG_STATELESS);
             if (p_sdio->link == NULL)
             {
                 BTE("Failed to create device link");
@@ -259,9 +259,9 @@ static void amlbt_unbind_bus(void)
 
     if (p_sdio->link != NULL)
     {
-        if (aml_priv_to_func(7) && device_is_registered(&aml_priv_to_func(7)->dev))
+        if (w2_aml_priv_to_func(7) && device_is_registered(&w2_aml_priv_to_func(7)->dev))
         {
-            link = find_device_link(&amlbt_sdio_device.dev, &aml_priv_to_func(7)->dev);
+            link = find_device_link(&amlbt_sdio_device.dev, &w2_aml_priv_to_func(7)->dev);
             BTF("find_device_link : %#x", (unsigned long)link);
         }
         if (link != NULL && link == p_sdio->link)
@@ -430,44 +430,44 @@ static void amlbt_input_device_deinit(void)
 
 static void amlbt_sdio_write_word(unsigned int addr, unsigned int data)
 {
-    if (g_hif_sdio_ops.bt_hi_write_word == NULL)
+    if (w2_g_hif_sdio_ops.bt_hi_write_word == NULL)
     {
         BTE("amlbt_sdio_write_word NULL");
         return ;
     }
-    g_hif_sdio_ops.bt_hi_write_word(addr, data);
+    w2_g_hif_sdio_ops.bt_hi_write_word(addr, data);
 }
 
 static unsigned int amlbt_sdio_read_word(unsigned int addr)
 {
     unsigned int value = 0;
-    if (g_hif_sdio_ops.bt_hi_read_word == NULL)
+    if (w2_g_hif_sdio_ops.bt_hi_read_word == NULL)
     {
         BTE("amlbt_sdio_read_word NULL");
         return 0;
     }
-    value = g_hif_sdio_ops.bt_hi_read_word(addr);
+    value = w2_g_hif_sdio_ops.bt_hi_read_word(addr);
     return value;
 }
 
 static void amlbt_sdio_read_sram(unsigned char* buf, unsigned char* addr, unsigned int len)
 {
-    if (g_hif_sdio_ops.hi_random_ram_read == NULL)
+    if (w2_g_hif_sdio_ops.hi_random_ram_read == NULL)
     {
         BTE("amlbt_sdio_read_sram NULL");
         return ;
     }
-    g_hif_sdio_ops.hi_random_ram_read(buf, addr, len);
+    w2_g_hif_sdio_ops.hi_random_ram_read(buf, addr, len);
 }
 
 static void amlbt_sdio_write_sram(unsigned char* buf, unsigned char* addr, unsigned int len)
 {
-    if (g_hif_sdio_ops.hi_random_ram_write == NULL)
+    if (w2_g_hif_sdio_ops.hi_random_ram_write == NULL)
     {
         BTE("amlbt_sdio_write_sram NULL");
         return ;
     }
-    g_hif_sdio_ops.hi_random_ram_write(buf, addr, len);
+    w2_g_hif_sdio_ops.hi_random_ram_write(buf, addr, len);
 }
 
 static void amlbt_wake_func(struct work_struct *work)
@@ -588,13 +588,13 @@ static void amlbt_w2s_resume_work(struct work_struct *work)
     int retry_cnt = 0;
     w2_sdio_bt_t *p_sdio = &sdio_bt;
 
-    while (atomic_read(&g_wifi_pm.bus_suspend_cnt) != 0)
+    while (atomic_read(&w2_g_wifi_pm.bus_suspend_cnt) != 0)
     {
         usleep_range(10000, 10000);
         wait_cnt++;
         if (wait_cnt > 100)
         {
-            BTE("wifi resume failed!!!!, %#x\n", atomic_read(&g_wifi_pm.bus_suspend_cnt));
+            BTE("wifi resume failed!!!!, %#x\n", atomic_read(&w2_g_wifi_pm.bus_suspend_cnt));
             return ;
         }
     }
@@ -767,33 +767,33 @@ static void amlbt_unregister_early_suspend(struct platform_device *dev)
 
 static void amlbt_sdio_register(void)
 {
-    unsigned int alive = atomic_read(&g_wifi_pm.wifi_enable);
+    unsigned int alive = atomic_read(&w2_g_wifi_pm.wifi_enable);
 
     if (alive)
     {
         BTF("wifi alive %#x\n", alive);
     }
-    else if (!g_sdio_driver_insmoded)
+    else if (!w2_g_sdio_driver_insmoded)
     {
-        BTF("wifi not alive %#x\n", g_sdio_driver_insmoded);
-        aml_sdio_init();
+        BTF("wifi not alive %#x\n", w2_g_sdio_driver_insmoded);
+        w2_aml_sdio_init();
         usleep_range(100000, 100000);
     }
 }
 
 static void amlbt_sdio_unregister(void)
 {
-    unsigned int alive = atomic_read(&g_wifi_pm.wifi_enable);
+    unsigned int alive = atomic_read(&w2_g_wifi_pm.wifi_enable);
 
     if (alive)
     {
         BTF("wifi alive %#x\n", alive);
     }
-    else if (g_sdio_driver_insmoded)
+    else if (w2_g_sdio_driver_insmoded)
     {
-        BTF("wifi not alive %#x\n", g_sdio_driver_insmoded);
-        aml_bus_state_detect_deinit();
-        aml_sdio_exit();
+        BTF("wifi not alive %#x\n", w2_g_sdio_driver_insmoded);
+        w2_aml_bus_state_detect_deinit();
+        w2_aml_sdio_exit();
     }
 }
 
@@ -821,7 +821,7 @@ static int amlbt_sdio_suspend(struct platform_device *dev, pm_message_t state)
     w2_sdio_bt_t *p_sdio = &sdio_bt;
 
     BTF("%s \n", __func__);
-    if (atomic_read(&g_wifi_pm.bus_suspend_cnt) == 0)
+    if (atomic_read(&w2_g_wifi_pm.bus_suspend_cnt) == 0)
     {
         amlbt_write_rclist_to_firmware();
         amlbt_aon_addr_bit_set(RG_AON_A24, 26);//set suspend bit
@@ -829,7 +829,7 @@ static int amlbt_sdio_suspend(struct platform_device *dev, pm_message_t state)
     }
     else
     {
-        BTE("%s failed bus_suspend_cnt %#x\n", __func__, atomic_read(&g_wifi_pm.bus_suspend_cnt));
+        BTE("%s failed bus_suspend_cnt %#x\n", __func__, atomic_read(&w2_g_wifi_pm.bus_suspend_cnt));
     }
     p_sdio->irq_handle = 0;
 
@@ -848,9 +848,9 @@ static int amlbt_sdio_resume(struct platform_device *dev)
     //if (p_sdio->firmware_start)
     //{
         //wait usb bus ready
-        BTF("g_wifi_pm.bus_suspend_cnt:%#x\n", g_wifi_pm.bus_suspend_cnt);
+        BTF("w2_g_wifi_pm.bus_suspend_cnt:%#x\n", w2_g_wifi_pm.bus_suspend_cnt);
 
-        if (atomic_read(&g_wifi_pm.bus_suspend_cnt) != 0)
+        if (atomic_read(&w2_g_wifi_pm.bus_suspend_cnt) != 0)
         {
             if (p_sdio->resume_wq == NULL)
             {

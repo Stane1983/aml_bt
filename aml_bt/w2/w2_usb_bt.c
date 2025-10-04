@@ -320,12 +320,12 @@ struct aml_bus_state_detect {
 };
 
 //static struct mutex bt_usb_mutex;
-extern struct mutex auc_usb_mutex;
-extern struct usb_device *g_udev;
-extern struct aml_pm_type g_wifi_pm;
-extern struct aml_bus_state_detect bus_state_detect;
+extern struct mutex w2_auc_usb_mutex;
+extern struct usb_device *w2_g_udev;
+extern struct aml_pm_type w2_g_wifi_pm;
+extern struct aml_bus_state_detect w2_bus_state_detect;
 extern unsigned char g_chip_function_ctrl;
-//extern bt_shutdown_func g_bt_shutdown_func;
+void *g_bt_shutdown_func = NULL;
 static struct crg_msc_cbw *g_cmd_buf;
 static unsigned char *g_bluez_buf = NULL;
 static struct aml_bt_info *info;
@@ -338,11 +338,11 @@ static unsigned int suspend_value = 0;
 #endif
 
 #define USB_BEGIN_LOCK() do {\
-    mutex_lock(&auc_usb_mutex);\
+    mutex_lock(&w2_auc_usb_mutex);\
 } while (0)
 
 #define USB_END_LOCK() do {\
-    mutex_unlock(&auc_usb_mutex);\
+    mutex_unlock(&w2_auc_usb_mutex);\
 } while (0)
 
 static void amlbt_release(struct device *dev);
@@ -525,13 +525,13 @@ static int amlbt_check_usb(void)
     w2_usb_bt_t *p_bt = &amlbt_dev;
 
     BTA("%s\n", __func__);
-    if (g_udev == NULL)
+    if (w2_g_udev == NULL)
     {
         BTE("interface NULL");
         return -1;
     }
 
-    while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing || bus_state_detect.is_recy_ongoing || (enum usb_udev_state)g_udev->state != USB_CONFIGURED)
+    while (w2_bus_state_detect.bus_err || w2_bus_state_detect.bus_reset_ongoing || w2_bus_state_detect.is_recy_ongoing || (enum usb_udev_state)w2_g_udev->state != USB_CONFIGURED)
     {
         wait_cnt = 0;
         BTI("recy start");
@@ -540,13 +540,13 @@ static int amlbt_check_usb(void)
             up(&amlbt_dev.sr_sem);//prevent use sr_sem before init.
         }
         amlbt_wakeup_lock();
-        while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing || bus_state_detect.is_recy_ongoing || (enum usb_udev_state)g_udev->state != USB_CONFIGURED)
+        while (w2_bus_state_detect.bus_err || w2_bus_state_detect.bus_reset_ongoing || w2_bus_state_detect.is_recy_ongoing || (enum usb_udev_state)w2_g_udev->state != USB_CONFIGURED)
         {
             usleep_range(20000, 20000);
             if (wait_cnt++ >= 500)
             {
-                BTE("bus_err %d reset %d recy %d udev %d", bus_state_detect.bus_err, bus_state_detect.bus_reset_ongoing,
-                            bus_state_detect.is_recy_ongoing, g_udev->state);
+                BTE("bus_err %d reset %d recy %d udev %d", w2_bus_state_detect.bus_err, w2_bus_state_detect.bus_reset_ongoing,
+                            w2_bus_state_detect.is_recy_ongoing, w2_g_udev->state);
                 break;
             }
         }
@@ -566,7 +566,7 @@ static int auc_write_reg_by_ep(unsigned int addr, unsigned int value, unsigned i
     memset(g_cmd_buf, 0, sizeof(*g_cmd_buf));
     auc_build_cbw(g_cmd_buf, AML_XFER_TO_DEVICE, 0, CMD_WRITE_REG, addr, value, len);
     /* cmd stage */
-    ret = usb_bulk_msg(g_udev, (unsigned int)usb_sndbulkpipe(g_udev, ep), (void *)g_cmd_buf, sizeof(*g_cmd_buf), &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
+    ret = usb_bulk_msg(w2_g_udev, (unsigned int)usb_sndbulkpipe(w2_g_udev, ep), (void *)g_cmd_buf, sizeof(*g_cmd_buf), &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
     if (ret) {
         BTE("auc_write_reg_by_ep Failed to usb_bulk_msg, ret %d, ep: %d, addr: 0x%x, len: %d, value: 0x%x\n", ret, ep, addr, len, value);
         USB_END_LOCK();
@@ -630,14 +630,14 @@ static int auc_read_reg_by_ep(unsigned int addr, unsigned int len, unsigned int 
     auc_build_cbw(g_cmd_buf, AML_XFER_TO_HOST, len, CMD_READ_REG, addr, 0, len);
 
     /* cmd stage */
-    ret = usb_bulk_msg(g_udev, usb_sndbulkpipe(g_udev, ep), (void *)g_cmd_buf, sizeof(*g_cmd_buf), &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
+    ret = usb_bulk_msg(w2_g_udev, usb_sndbulkpipe(w2_g_udev, ep), (void *)g_cmd_buf, sizeof(*g_cmd_buf), &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
     if (ret) {
         BTE("auc_read_reg_by_ep cmd Failed to usb_bulk_msg, ret %d, ep: %d, addr: 0x%x, len: %d\n", ret, ep, addr, len);
         goto err_kfree;
     }
 
     /* data stage */
-    ret = usb_bulk_msg(g_udev, usb_rcvbulkpipe(g_udev, ep), (void *)data, len, &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
+    ret = usb_bulk_msg(w2_g_udev, usb_rcvbulkpipe(w2_g_udev, ep), (void *)data, len, &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
     if (ret) {
         BTE("auc_read_reg_by_ep data Failed to usb_bulk_msg, ret %d, ep: %d, addr: 0x%x, len: %d\n", ret ,ep, addr, len);
         goto err_kfree;
@@ -708,7 +708,7 @@ static int auc_write_sram_by_ep(unsigned char *pdata, unsigned int addr, unsigne
         memset(g_cmd_buf, 0, sizeof(*g_cmd_buf));
         auc_build_cbw_add_data(g_cmd_buf, AML_XFER_TO_DEVICE, len, CMD_WRITE_SRAM, addr, 0, len, pdata);
         /* cmd stage */
-        ret = usb_bulk_msg(g_udev, usb_sndbulkpipe(g_udev, ep), (void *)g_cmd_buf, sizeof(*g_cmd_buf), &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
+        ret = usb_bulk_msg(w2_g_udev, usb_sndbulkpipe(w2_g_udev, ep), (void *)g_cmd_buf, sizeof(*g_cmd_buf), &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
         if (ret) {
             BTE("auc_write_sram_by_ep 1 Failed to usb_bulk_msg, ret %d, ep: %d, addr: 0x%x, len: %d\n", ret, ep, addr, len);
             BTE("usb command transmit fail,g_cmd_buf->add is %d,len is %d\n", addr, len);
@@ -721,7 +721,7 @@ static int auc_write_sram_by_ep(unsigned char *pdata, unsigned int addr, unsigne
         memset(g_cmd_buf, 0, sizeof(*g_cmd_buf));
         auc_build_cbw(g_cmd_buf, AML_XFER_TO_DEVICE, len, CMD_WRITE_SRAM, addr, 0, len);
         /* cmd stage */
-        ret = usb_bulk_msg(g_udev, usb_sndbulkpipe(g_udev, ep), (void *)g_cmd_buf, sizeof(*g_cmd_buf), &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
+        ret = usb_bulk_msg(w2_g_udev, usb_sndbulkpipe(w2_g_udev, ep), (void *)g_cmd_buf, sizeof(*g_cmd_buf), &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
         if (ret) {
             BTE("auc_write_sram_by_ep 2 Failed to usb_bulk_msg, ret %d, ep: %d, addr: 0x%x, len: %d\n", ret, ep, addr, len);
             BTE("usb command transmit fail,g_cmd_buf->add is %d,len is %d\n", addr, len);
@@ -737,7 +737,7 @@ static int auc_write_sram_by_ep(unsigned char *pdata, unsigned int addr, unsigne
 
         memcpy(kmalloc_buf, pdata, len);
         /* data stage */
-        ret = usb_bulk_msg(g_udev, usb_sndbulkpipe(g_udev, ep), (void *)kmalloc_buf, len, &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
+        ret = usb_bulk_msg(w2_g_udev, usb_sndbulkpipe(w2_g_udev, ep), (void *)kmalloc_buf, len, &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
         if (ret) {
             BTE("auc_write_sram_by_ep data Failed to usb_bulk_msg, ret %d, ep: %d,  addr: 0x%x, len: %d\n", ret, ep, addr, len);
             goto err_kfree;
@@ -803,7 +803,7 @@ static int auc_read_sram_by_ep(unsigned char *pdata, unsigned int addr, unsigned
     memset(g_cmd_buf, 0, sizeof(*g_cmd_buf));
     auc_build_cbw(g_cmd_buf,  AML_XFER_TO_HOST, len, CMD_READ_SRAM, addr, 0, len);
     /* cmd stage */
-    ret = usb_bulk_msg(g_udev, usb_sndbulkpipe(g_udev, ep), (void *)g_cmd_buf, sizeof(*g_cmd_buf), &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
+    ret = usb_bulk_msg(w2_g_udev, usb_sndbulkpipe(w2_g_udev, ep), (void *)g_cmd_buf, sizeof(*g_cmd_buf), &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
     if (ret) {
         BTE("auc_read_sram_by_ep cmd Failed to usb_bulk_msg, ret %d, ep: %d, addr: 0x%x, len: %d\n", ret, ep, addr, len);
         BTE("usb command transmit fail,g_cmd_buf->add is %d,len is %d\n",addr,len);
@@ -818,7 +818,7 @@ static int auc_read_sram_by_ep(unsigned char *pdata, unsigned int addr, unsigned
     }
 
     /* data stage */
-    ret = usb_bulk_msg(g_udev, usb_rcvbulkpipe(g_udev, ep),(void *)kmalloc_buf, len, &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
+    ret = usb_bulk_msg(w2_g_udev, usb_rcvbulkpipe(w2_g_udev, ep),(void *)kmalloc_buf, len, &actual_length, AML_USB_CONTROL_MSG_TIMEOUT);
     if (ret) {
         BTE("auc_read_sram_by_ep cmd Failed to usb_bulk_msg, ret %d, ep: %d, addr: 0x%x, len: %d\n", ret, ep, addr, len);
         goto err_kfree;
@@ -1060,10 +1060,10 @@ static int amlbt_resume_fw(void)
 
      BTF("%s\n", __func__);
     //wait usb bus ready
-    if ((atomic_read(&g_wifi_pm.bus_suspend_cnt) == 0 && (enum usb_udev_state)g_udev->state == USB_CONFIGURED)
-                                || bus_state_detect.is_recy_ongoing)
+    if ((atomic_read(&w2_g_wifi_pm.bus_suspend_cnt) == 0 && (enum usb_udev_state)w2_g_udev->state == USB_CONFIGURED)
+                                || w2_bus_state_detect.is_recy_ongoing)
     {
-        BTF("%s g_wifi_pm.bus_suspend_cnt 0\n",__func__);
+        BTF("%s w2_g_wifi_pm.bus_suspend_cnt 0\n",__func__);
         //forbid fw sleep
         ret = amlbt_aon_addr_bit_set(RG_AON_A24, 25);
         if (ret != 0)
@@ -1942,16 +1942,16 @@ static void amlbt_lateresume(struct early_suspend *h)
 static int amlbt_bind_bus(void)
 {
     w2_usb_bt_t *p_bt = &amlbt_dev;
-    if (g_udev == NULL)
+    if (w2_g_udev == NULL)
     {
-        BTE("g_udev is NULL");
+        BTE("w2_g_udev is NULL");
         return -ENOMEM;
     }
     else
     {
         if (p_bt->link == NULL)
         {
-            p_bt->link = device_link_add(&amlbt_device.dev, &g_udev->dev, DL_FLAG_PM_RUNTIME | DL_FLAG_STATELESS);
+            p_bt->link = device_link_add(&amlbt_device.dev, &w2_g_udev->dev, DL_FLAG_PM_RUNTIME | DL_FLAG_STATELESS);
             if (p_bt->link == NULL)
             {
                 BTE("Failed to create device link");
@@ -1989,9 +1989,9 @@ static void amlbt_unbind_bus(void)
 
     if (p_bt->link != NULL)
     {
-        if (g_udev && device_is_registered(&g_udev->dev))
+        if (w2_g_udev && device_is_registered(&w2_g_udev->dev))
         {
-            link = find_device_link(&amlbt_device.dev, &g_udev->dev);
+            link = find_device_link(&amlbt_device.dev, &w2_g_udev->dev);
             BTI("find_device_link : %#x", (unsigned long)link);
         }
         if (link != NULL && link == p_bt->link)

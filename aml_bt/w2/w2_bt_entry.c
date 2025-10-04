@@ -42,8 +42,8 @@
 #include "w2_usb_bt.h"
 #include "w2_pcie_bt.h"
 
-extern struct aml_hif_sdio_ops g_hif_sdio_ops;
-extern struct aml_pm_type g_wifi_pm;
+extern struct aml_hif_sdio_ops w2_g_hif_sdio_ops;
+extern struct aml_pm_type w2_g_wifi_pm;
 
 static int w2_bt_init(void)
 {
@@ -69,7 +69,7 @@ static int w2_bt_init(void)
     else if (INTF_TYPE_IS_PCIE(amlbt_if_type))
     {
         BTI("%s w2 pcie \n", __func__);
-        ret = amlbt_w2p_init();
+        ret = 0;  //amlbt_w2p_init();
     }
     else
     {
@@ -102,7 +102,7 @@ static void w2_bt_exit(void)
     else if (INTF_TYPE_IS_PCIE(amlbt_if_type))
     {
         BTI("%s w2 pcie \n", __func__);
-        amlbt_w2p_exit();
+        //amlbt_w2p_exit();
     }
     else
     {

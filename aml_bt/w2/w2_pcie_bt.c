@@ -150,9 +150,9 @@ struct aml_plat_pci {
 };
 
 extern struct aml_plat_pci *g_aml_plat_pci;
-extern struct aml_pm_type g_wifi_pm;
-extern uint32_t aml_pci_read_for_bt(int base, u32 offset);
-extern void aml_pci_write_for_bt(u32 val, int base, u32 offset);
+extern struct aml_pm_type w2_g_wifi_pm;
+extern uint32_t w2_aml_pci_read_for_bt(int base, u32 offset);
+extern void w2_aml_pci_write_for_bt(u32 val, int base, u32 offset);
 extern int aml_pci_insmod(void);
 extern void aml_pci_rmmod(void);
 extern unsigned char g_pci_driver_insmoded;
@@ -186,30 +186,30 @@ static void amlbt_w2p_resume_work(struct work_struct *work);
 static void amlbt_wake_func(struct work_struct *work)
 {
     w2_pcie_bt_t *p_pcie = &pcie_bt;
-    unsigned int key = aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A17);
+    unsigned int key = w2_aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A17);
 
     BTF("key %#x\n", key);
     if (key & BIT(5))   //bit 5 power key, bit 6 netfix
     {
         key &= ~BIT(5);
-        aml_pci_write_for_bt(key, AML_ADDR_AON, RG_AON_A17);
+        w2_aml_pci_write_for_bt(key, AML_ADDR_AON, RG_AON_A17);
         input_event(p_pcie->input_dev, EV_KEY, KEY_POWER, 1);
         input_sync(p_pcie->input_dev);
         input_event(p_pcie->input_dev, EV_KEY, KEY_POWER, 0);
         input_sync(p_pcie->input_dev);
         p_pcie->irq_handle = 0;
-        BTF("%s input power key %#x\n", __func__, aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A17));
+        BTF("%s input power key %#x\n", __func__, w2_aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A17));
     }
     else if (key & BIT(6))
     {
         key &= ~BIT(6);
-        aml_pci_write_for_bt(key, AML_ADDR_AON, RG_AON_A17);
+        w2_aml_pci_write_for_bt(key, AML_ADDR_AON, RG_AON_A17);
         input_event(p_pcie->input_dev, EV_KEY, KEY_NETFLIX, 1);
         input_sync(p_pcie->input_dev);
         input_event(p_pcie->input_dev, EV_KEY, KEY_NETFLIX, 0);
         input_sync(p_pcie->input_dev);
         p_pcie->irq_handle = 0;
-        BTF("%s input Netflix key %#x \n", __func__, aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A17));
+        BTF("%s input Netflix key %#x \n", __func__, w2_aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A17));
     }
 }
 
@@ -374,22 +374,22 @@ static void amlbt_aon_addr_bit_set(unsigned int addr, unsigned int bit)
 {
     unsigned int reg_value = 0;
 
-    reg_value = aml_pci_read_for_bt(AML_ADDR_AON, addr);
+    reg_value = w2_aml_pci_read_for_bt(AML_ADDR_AON, addr);
     BTI("%#x: %#x\n", addr, reg_value);
     reg_value |= BIT(bit);
-    aml_pci_write_for_bt(reg_value, AML_ADDR_AON, addr);
-    BTI("%#x: %#x", addr, aml_pci_read_for_bt(AML_ADDR_AON, addr));
+    w2_aml_pci_write_for_bt(reg_value, AML_ADDR_AON, addr);
+    BTI("%#x: %#x", addr, w2_aml_pci_read_for_bt(AML_ADDR_AON, addr));
 }
 
 static void amlbt_aon_addr_bit_clr(unsigned int addr, unsigned int bit)
 {
     unsigned int reg_value = 0;
 
-    reg_value = aml_pci_read_for_bt(AML_ADDR_AON, addr);
+    reg_value = w2_aml_pci_read_for_bt(AML_ADDR_AON, addr);
     BTI("%#x: %#x\n", addr, reg_value);
     reg_value &= ~BIT(bit);
-    aml_pci_write_for_bt(reg_value, AML_ADDR_AON, addr);
-    BTI("%#x: %#x", addr, aml_pci_read_for_bt(AML_ADDR_AON, addr));
+    w2_aml_pci_write_for_bt(reg_value, AML_ADDR_AON, addr);
+    BTI("%#x: %#x", addr, w2_aml_pci_read_for_bt(AML_ADDR_AON, addr));
 }
 
 static unsigned int amlbt_aon_addr_bit_get(unsigned int addr, unsigned int bit)
@@ -397,7 +397,7 @@ static unsigned int amlbt_aon_addr_bit_get(unsigned int addr, unsigned int bit)
     unsigned int reg_value = 0;
     unsigned int bit_value = 0;
 
-    reg_value = aml_pci_read_for_bt(AML_ADDR_AON, addr);
+    reg_value = w2_aml_pci_read_for_bt(AML_ADDR_AON, addr);
 
     bit_value = (reg_value >> bit) & 0x1;
     BTI("get %#x bit%#d: %#x\n", addr, bit, bit_value);
@@ -409,7 +409,7 @@ static unsigned int amlbt_fw_pmu_sleep_get(void)
 {
     unsigned int reg_value = 0;
 
-    reg_value = aml_pci_read_for_bt(AML_ADDR_AON, RG_BT_PMU_A15);
+    reg_value = w2_aml_pci_read_for_bt(AML_ADDR_AON, RG_BT_PMU_A15);
     BTI("%s PMU FSM %#x\n", __func__, (reg_value & 0xF));
 
     if (((reg_value & 0xF) == PMU_SLEEP_MODE) || ((reg_value & 0xF) == PMU_ACT_SLEEP))
@@ -426,11 +426,11 @@ static int amlbt_wake_fw(void)
 {
     unsigned int reg_value = 0;
 
-    reg_value = aml_pci_read_for_bt(AML_ADDR_AON, RG_BT_PMU_A16);
+    reg_value = w2_aml_pci_read_for_bt(AML_ADDR_AON, RG_BT_PMU_A16);
     reg_value &= ~BIT(0);
     reg_value |= BIT(1);
-    aml_pci_write_for_bt(reg_value, AML_ADDR_AON, RG_BT_PMU_A16);
-    reg_value = aml_pci_read_for_bt(AML_ADDR_AON, RG_BT_PMU_A16);
+    w2_aml_pci_write_for_bt(reg_value, AML_ADDR_AON, RG_BT_PMU_A16);
+    reg_value = w2_aml_pci_read_for_bt(AML_ADDR_AON, RG_BT_PMU_A16);
 
     BTI("%s RG_BT_PMU_A16 %#x\n", __func__, reg_value);
 
@@ -538,7 +538,7 @@ static int amlbt_bind_bus(void)
 
     if (g_aml_plat_pci->pci_dev == NULL)
     {
-        BTE("aml_priv_to_func(7) is NULL");
+        BTE("w2_aml_priv_to_func(7) is NULL");
         return -ENOMEM;
     }
     else
@@ -638,13 +638,13 @@ static void amlbt_w2p_resume_work(struct work_struct *work)
     int retry_cnt = 0;
     w2_pcie_bt_t *p_pcie = &pcie_bt;
 
-    while (atomic_read(&g_wifi_pm.bus_suspend_cnt) != 0)
+    while (atomic_read(&w2_g_wifi_pm.bus_suspend_cnt) != 0)
     {
         usleep_range(10000, 10000);
         wait_cnt++;
         if (wait_cnt > 100)
         {
-            BTF("wifi resume failed!!!!, %#x\n", atomic_read(&g_wifi_pm.bus_suspend_cnt));
+            BTF("wifi resume failed!!!!, %#x\n", atomic_read(&w2_g_wifi_pm.bus_suspend_cnt));
             return ;
         }
     }
@@ -818,7 +818,7 @@ static void amlbt_unregister_early_suspend(struct platform_device *dev)
 
 static void amlbt_pcie_register(void)
 {
-    unsigned int alive = atomic_read(&g_wifi_pm.wifi_enable);
+    unsigned int alive = atomic_read(&w2_g_wifi_pm.wifi_enable);
 
     if (alive)
     {
@@ -834,7 +834,7 @@ static void amlbt_pcie_register(void)
 
 static void amlbt_pcie_unregister(void)
 {
-    unsigned int alive = atomic_read(&g_wifi_pm.wifi_enable);
+    unsigned int alive = atomic_read(&w2_g_wifi_pm.wifi_enable);
 
     if (alive)
     {
@@ -872,7 +872,7 @@ static int amlbt_pcie_suspend(struct platform_device *dev, pm_message_t state)
     BTF("%s \n", __func__);
     //if (p_pcie->firmware_start)
     //{
-        if (atomic_read(&g_wifi_pm.bus_suspend_cnt) == 0)
+        if (atomic_read(&w2_g_wifi_pm.bus_suspend_cnt) == 0)
         {
             amlbt_write_rclist_to_firmware();
             amlbt_aon_addr_bit_set(RG_AON_A24, 26);//set suspend bit
@@ -880,7 +880,7 @@ static int amlbt_pcie_suspend(struct platform_device *dev, pm_message_t state)
         }
         else
         {
-            BTF("%s failed bus_suspend_cnt %#x\n", __func__, atomic_read(&g_wifi_pm.bus_suspend_cnt));
+            BTF("%s failed bus_suspend_cnt %#x\n", __func__, atomic_read(&w2_g_wifi_pm.bus_suspend_cnt));
         }
         pcie_bt.irq_handle = 0;
     //}
@@ -899,8 +899,8 @@ static int amlbt_pcie_resume(struct platform_device *dev)
     //if (p_pcie->firmware_start)
     //{
         //wait usb bus ready
-        BTF("g_wifi_pm.bus_suspend_cnt:%#x\n", g_wifi_pm.bus_suspend_cnt);
-        if (atomic_read(&g_wifi_pm.bus_suspend_cnt) != 0)
+        BTF("w2_g_wifi_pm.bus_suspend_cnt:%#x\n", w2_g_wifi_pm.bus_suspend_cnt);
+        if (atomic_read(&w2_g_wifi_pm.bus_suspend_cnt) != 0)
         {
             if (p_pcie->resume_wq == NULL)
             {
@@ -966,17 +966,17 @@ static void amlbt_pcie_shutdown(struct platform_device *dev)
 static void amlbt_show_fw_debug_info(void)
 {
     unsigned int value = 0;
-    BTI("PMU 0x00f03040:%#x \n", aml_pci_read_for_bt(AML_ADDR_AON, REG_PMU_POWER_CFG));
+    BTI("PMU 0x00f03040:%#x \n", w2_aml_pci_read_for_bt(AML_ADDR_AON, REG_PMU_POWER_CFG));
     usleep_range(10000, 10000);
-    value = aml_pci_read_for_bt(AML_ADDR_CPU, REG_FW_PC);
+    value = w2_aml_pci_read_for_bt(AML_ADDR_CPU, REG_FW_PC);
     value = (value >> 6);
     BTI("pc1 0x200034:%#x\n", value);
     usleep_range(10000, 10000);
-    value = aml_pci_read_for_bt(AML_ADDR_CPU, REG_FW_PC);
+    value = w2_aml_pci_read_for_bt(AML_ADDR_CPU, REG_FW_PC);
     value = (value >> 6);
     BTI("pc2 0x200034:%#x\n", value);
     usleep_range(10000, 10000);
-    value = aml_pci_read_for_bt(AML_ADDR_CPU, REG_FW_PC);
+    value = w2_aml_pci_read_for_bt(AML_ADDR_CPU, REG_FW_PC);
     value = (value >> 6);
     BTI("pc3 0x200034:%#x\n", value);
 }
@@ -1006,8 +1006,8 @@ static int amlbt_pcie_download_firmware(w2_pcie_bt_t *p_bt)
     while (offset < ICCM_SIZE)
     {
         val = ((p_bt->iccm_buf[offset+3]<<24)|(p_bt->iccm_buf[offset+2]<<16)|(p_bt->iccm_buf[offset+1]<<8)|p_bt->iccm_buf[offset]);
-        aml_pci_write_for_bt(val, AML_ADDR_CPU, iccm_base_addr);
-        check_buf = aml_pci_read_for_bt(AML_ADDR_CPU, iccm_base_addr);
+        w2_aml_pci_write_for_bt(val, AML_ADDR_CPU, iccm_base_addr);
+        check_buf = w2_aml_pci_read_for_bt(AML_ADDR_CPU, iccm_base_addr);
         if (check_buf != val)
         {
             BTE("Firmware iccm check error! val:%#x, check_buf:%#x, offset %#x\n", val, check_buf, offset);
@@ -1027,8 +1027,8 @@ static int amlbt_pcie_download_firmware(w2_pcie_bt_t *p_bt)
     while (offset < DCCM_SIZE)
     {
         val = ((p_bt->dccm_buf[offset+3]<<24)|(p_bt->dccm_buf[offset+2]<<16)|(p_bt->dccm_buf[offset+1]<<8)|p_bt->dccm_buf[offset]);
-        aml_pci_write_for_bt(val, AML_ADDR_CPU, dccm_base_addr);
-        check_buf = aml_pci_read_for_bt(AML_ADDR_CPU, dccm_base_addr);
+        w2_aml_pci_write_for_bt(val, AML_ADDR_CPU, dccm_base_addr);
+        check_buf = w2_aml_pci_read_for_bt(AML_ADDR_CPU, dccm_base_addr);
         if (check_buf != val)
         {
             BTE("Firmware dccm check error! val:%#x, check_buf:%#x, offset %#x\n", val, check_buf, offset);
@@ -1071,10 +1071,10 @@ static int amlbt_load_firmware(w2_pcie_bt_t *p_bt)
     p_bt->iccm_buf = &fw_entry->data[ICCM_ROM_SIZE + 8];
     p_bt->dccm_buf = &fw_entry->data[iccm_size + 8];
 
-    BTI("pmu %#x\n",aml_pci_read_for_bt(AML_ADDR_AON, 0xf02078));
-    aml_pci_write_for_bt(((BIT_PHY|BIT_MAC|BIT_CPU)<<16)|(BIT_PHY|BIT_MAC|BIT_CPU), AML_ADDR_AON, REG_DEV_RESET);
+    BTI("pmu %#x\n",w2_aml_pci_read_for_bt(AML_ADDR_AON, 0xf02078));
+    w2_aml_pci_write_for_bt(((BIT_PHY|BIT_MAC|BIT_CPU)<<16)|(BIT_PHY|BIT_MAC|BIT_CPU), AML_ADDR_AON, REG_DEV_RESET);
     usleep_range(1000, 1000);
-    aml_pci_write_for_bt((BIT_CPU<<16)|BIT_CPU, AML_ADDR_AON, REG_DEV_RESET);
+    w2_aml_pci_write_for_bt((BIT_CPU<<16)|BIT_CPU, AML_ADDR_AON, REG_DEV_RESET);
     BTI("hold bt cpu\n");
     ret = amlbt_pcie_download_firmware(p_bt);
     release_firmware(fw_entry);
@@ -1083,39 +1083,39 @@ static int amlbt_load_firmware(w2_pcie_bt_t *p_bt)
         BTE("Download firmware failed!!\n");
         return ret;
     }
-    reg = aml_pci_read_for_bt(AML_ADDR_AON, REG_DF_A194);
+    reg = w2_aml_pci_read_for_bt(AML_ADDR_AON, REG_DF_A194);
     reg &= 0xfffffffc;
     reg |= (p_bt->isolation & 0x3);
-    aml_pci_write_for_bt(reg, AML_ADDR_AON, REG_DF_A194);
+    w2_aml_pci_write_for_bt(reg, AML_ADDR_AON, REG_DF_A194);
 
-    reg = aml_pci_read_for_bt(AML_ADDR_AON, REG_FW_MODE);
+    reg = w2_aml_pci_read_for_bt(AML_ADDR_AON, REG_FW_MODE);
     reg &= 0xfffffffc;
     reg |= (p_bt->fw_mode & 0x3);
-    aml_pci_write_for_bt(reg, AML_ADDR_AON, REG_FW_MODE);
+    w2_aml_pci_write_for_bt(reg, AML_ADDR_AON, REG_FW_MODE);
 
-    reg = aml_pci_read_for_bt(AML_ADDR_AON, REG_PMU_POWER_CFG);
+    reg = w2_aml_pci_read_for_bt(AML_ADDR_AON, REG_PMU_POWER_CFG);
     reg &= 0xedffffff;
     reg |= ((p_bt->antenna << BIT_RF_NUM)|(p_bt->bt_sink << BT_SINK_MODE));
-    aml_pci_write_for_bt(reg, AML_ADDR_AON, REG_PMU_POWER_CFG);
+    w2_aml_pci_write_for_bt(reg, AML_ADDR_AON, REG_PMU_POWER_CFG);
 
-    reg = aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A53);
+    reg = w2_aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A53);
     reg &= 0xffcf0000;
     reg |= ((p_bt->pin_mux << 20) | (p_bt->factory << 21));
     reg |= (((p_bt->edr_digit_gain & 0xff) << 8) | (p_bt->br_digit_gain & 0xff));
-    aml_pci_write_for_bt(reg, AML_ADDR_AON, RG_AON_A53);
+    w2_aml_pci_write_for_bt(reg, AML_ADDR_AON, RG_AON_A53);
 
-    reg = aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A59);
+    reg = w2_aml_pci_read_for_bt(AML_ADDR_AON, RG_AON_A59);
     reg &= 0xfffffffc;
     reg |= (p_bt->fw_log & 0x3);
-    aml_pci_write_for_bt(reg, AML_ADDR_AON, RG_AON_A59);
-    aml_pci_write_for_bt(reg, AML_ADDR_AON, REG_DEV_RESET);
+    w2_aml_pci_write_for_bt(reg, AML_ADDR_AON, RG_AON_A59);
+    w2_aml_pci_write_for_bt(reg, AML_ADDR_AON, REG_DEV_RESET);
     BTI("start bt cpu ok!\n");
     usleep_range(50000, 50000);
-    BTI("pc1:%#x\n", aml_pci_read_for_bt(AML_ADDR_CPU, REG_FW_PC));
+    BTI("pc1:%#x\n", w2_aml_pci_read_for_bt(AML_ADDR_CPU, REG_FW_PC));
     usleep_range(10000, 10000);
-    BTI("pc2:%#x\n", aml_pci_read_for_bt(AML_ADDR_CPU, REG_FW_PC));
+    BTI("pc2:%#x\n", w2_aml_pci_read_for_bt(AML_ADDR_CPU, REG_FW_PC));
     usleep_range(10000, 10000);
-    BTI("pc3:%#x\n", aml_pci_read_for_bt(AML_ADDR_CPU, REG_FW_PC));
+    BTI("pc3:%#x\n", w2_aml_pci_read_for_bt(AML_ADDR_CPU, REG_FW_PC));
     p_bt->iccm_buf = NULL;
     p_bt->dccm_buf = NULL;
     return 0;
@@ -1144,10 +1144,10 @@ static int amlbt_pcie_fops_open(struct inode *inode, struct file *file)
         amlbt_pcie_unregister();
         return -EIO;
     }
-    ret = aml_pci_read_for_bt(AML_ADDR_AON,REG_DF_A194);
+    ret = w2_aml_pci_read_for_bt(AML_ADDR_AON,REG_DF_A194);
     reg &= 0xfffffffc;
     reg |= (p_pcie->isolation & 0x3);
-    aml_pci_write_for_bt(reg,AML_ADDR_AON,REG_DF_A194);
+    w2_aml_pci_write_for_bt(reg,AML_ADDR_AON,REG_DF_A194);
 
     pcie_bt.firmware_start = 1;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(4, 10, 0)
@@ -1166,7 +1166,7 @@ static int amlbt_pcie_fops_close(struct inode *inode, struct file *file)
     amlbt_aon_addr_bit_clr(RG_AON_A24, 24); //firmware currently not used
 
     amlbt_pcie_res_deinit(p_pcie);
-    aml_pci_write_for_bt(0, AML_ADDR_AON, RG_AON_A15);
+    w2_aml_pci_write_for_bt(0, AML_ADDR_AON, RG_AON_A15);
     //amlbt_unregister_interrupt_gpio(&pcie_bt);
     if (!p_pcie->shutdown_value)
     {
