@@ -43,8 +43,8 @@ extern "C" {
 #define PCEDIT_MAC        "/tmp/bdaddr"
 #define FW_VER_FILE       "/tmp/bt_fw_version"
 #else
-#define AMLBT_ADDR_PATH   "/etc/bluetooth/aml/bt_addr"
-#define FW_VER_FILE       "/etc/bluetooth/aml/bt_fw_version"
+#define AMLBT_ADDR_PATH   "/storage/.config/bluetooth/aml/bt_addr"
+#define FW_VER_FILE       "/storage/.config/bluetooth/aml/bt_fw_version"
 #endif
 
 #define AMLBT_RANDOM_DEV "/dev/urandom"
