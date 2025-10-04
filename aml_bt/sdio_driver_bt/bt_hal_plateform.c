@@ -8,7 +8,7 @@
 #include <linux/platform_device.h>
 #include <linux/version.h>
 
-extern unsigned char (*host_wake_w1_req)(void);
+extern unsigned char (*w1_host_wake_w1_req)(void);
 static int reg_config_complete = 0;
 static struct cdev BTAML_cdev;
 static int BTAML_major;
@@ -21,8 +21,8 @@ static struct device *pBTDev;
 
 static char *chip_name = "aml_w1";
 //extern unsigned int amlbt_poweron;
-extern void aml_wifi_sdio_power_lock(void);
-extern void aml_wifi_sdio_power_unlock(void);
+extern void w1_aml_wifi_sdio_power_lock(void);
+extern void w1_aml_wifi_sdio_power_unlock(void);
 
 static int bt_aml_insmod(void);
 static void bt_aml_rmmod(void);
@@ -44,27 +44,27 @@ static int config_bt_pmu_reg(bool is_power_on)
     unsigned int wait_count = 0;
 
     /* set wifi keep alive, BIT(5)*/
-    if (g_w1_hif_ops.hi_bottom_read8 == NULL)
+    if (w1_g_w1_hif_ops.hi_bottom_read8 == NULL)
     {
-        PRINT("config_bt_pmu_reg(): can't get g_w1_hif_ops interface!!!!!!!!!!\n");
+        PRINT("config_bt_pmu_reg(): can't get w1_g_w1_hif_ops interface!!!!!!!!!!\n");
         return (-1);
     }
-    host_req_status = g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
+    host_req_status = w1_g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
     PRINT("host_req_status = 0x%x\n", host_req_status);
     host_req_status |= BIT(5);
-    g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
+    w1_g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
 
     /* wake wifi fw firstly */
-    if (host_wake_w1_req != NULL)
+    if (w1_host_wake_w1_req != NULL)
     {
         PRINT("BT lock\n");
-        aml_wifi_sdio_power_lock();
-        while (host_wake_w1_req() == 0)
+        w1_aml_wifi_sdio_power_lock();
+        while (w1_host_wake_w1_req() == 0)
         {
             msleep(10);
             PRINT("BT insmod, wake wifi failed\n");
         }
-        aml_wifi_sdio_power_unlock();
+        w1_aml_wifi_sdio_power_unlock();
         PRINT("BT unlock\n");
     }
     else
@@ -74,71 +74,71 @@ static int config_bt_pmu_reg(bool is_power_on)
 
     if (is_power_on)
     {
-        value_pmu_A12 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A12);
-        value_pmu_A13 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A13);
-        value_pmu_A14 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A14);
-        value_pmu_A15 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
-        value_pmu_A16 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
-        value_pmu_A17 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A17);
-        value_pmu_A18 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A18);
-        value_pmu_A20 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A20);
-        value_pmu_A22 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A22);
+        value_pmu_A12 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A12);
+        value_pmu_A13 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A13);
+        value_pmu_A14 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A14);
+        value_pmu_A15 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
+        value_pmu_A16 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
+        value_pmu_A17 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A17);
+        value_pmu_A18 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A18);
+        value_pmu_A20 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A20);
+        value_pmu_A22 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A22);
         PRINT("BT power on: before write A12=0x%x, A13=0x%x, A14=0x%x, A15=0x%x, A16=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x\n",
               value_pmu_A12, value_pmu_A13, value_pmu_A14, value_pmu_A15, value_pmu_A16, value_pmu_A17, value_pmu_A18, value_pmu_A20,
               value_pmu_A22);
 
         /* set bt work flag && xosc/bbpll/ao_iso/pmu mask*/
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A14, 0x1f);
-        PRINT("BT power on:RG_BT_PMU_A14 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A14));
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A14, 0x1f);
+        PRINT("BT power on:RG_BT_PMU_A14 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A14));
 
         /* release pmu fsm : bit0 */
-        host_req_status = g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
+        host_req_status = w1_g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
         host_req_status &= ~BIT(0);
-        g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
+        w1_g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
         msleep(10);
 
         /* reset bt, then release bt */
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A17, 0x700);
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A17, 0x700);
         msleep(1);
-        PRINT("BT power on:RG_BT_PMU_A17 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A17));
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A20, 0x0);
+        PRINT("BT power on:RG_BT_PMU_A17 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A17));
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A20, 0x0);
         msleep(1);
-        PRINT("BT power on:RG_BT_PMU_A20 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A20));
-        //g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A12, value_pmu_A12|0xc0);
+        PRINT("BT power on:RG_BT_PMU_A20 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A20));
+        //w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A12, value_pmu_A12|0xc0);
         //msleep(1);
-        //PRINT("BT power on:RG_BT_PMU_A12 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A12));
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A18, 0x1700);
+        //PRINT("BT power on:RG_BT_PMU_A12 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A12));
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A18, 0x1700);
         PRINT("BT power on: %s, line=%d\n", __func__, __LINE__);
         msleep(1);
-        PRINT("BT power on:RG_BT_PMU_A18 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A18));
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A22, 0x704);
+        PRINT("BT power on:RG_BT_PMU_A18 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A18));
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A22, 0x704);
         msleep(10);
-        PRINT("BT power on:RG_BT_PMU_A22 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A22));
+        PRINT("BT power on:RG_BT_PMU_A22 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A22));
 
         /* rg_bb_reset_man */
         value_pmu_A12 = value_pmu_A12 & 0xffffff3f;
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A12, value_pmu_A12 | 0x80);
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A12, value_pmu_A12 | 0x80);
         msleep(1);
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A12, value_pmu_A12 | 0xc0);
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A12, value_pmu_A12 | 0xc0);
         msleep(1);
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A12, value_pmu_A12 | 0x80);
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A12, value_pmu_A12 | 0x80);
         msleep(1);
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A12, value_pmu_A12 | 0x00);
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A12, value_pmu_A12 | 0x00);
         msleep(1);
-        PRINT("BT power on:RG_BT_PMU_A12 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A12));
+        PRINT("BT power on:RG_BT_PMU_A12 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A12));
 
         /* set bt pmu fsm to PMU_PWR_OFF */
-        host_req_status = g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
+        host_req_status = w1_g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
         host_req_status |= (PMU_PWR_OFF << 1) | BIT(0);
-        g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
+        w1_g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
 
         /* release bt pmu fsm */
-        host_req_status = g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
+        host_req_status = w1_g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
         host_req_status &= ~(0x1f);
-        g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
+        w1_g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
         msleep(20);
 
-        bt_pmu_status = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
+        bt_pmu_status = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
         PRINT("%s bt_pmu_status:0x%x\n", __func__, bt_pmu_status);
 
         /* wait bt pmu fsm to PMU_ACT_MODE*/
@@ -146,40 +146,40 @@ static int config_bt_pmu_reg(bool is_power_on)
         {
             msleep(5);
             PRINT("%s bt_pmu_status:0x%x\n", __func__, bt_pmu_status);
-            bt_pmu_status = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
+            bt_pmu_status = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
         }
 
-        value_pmu_A12 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A12);
-        value_pmu_A13 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A13);
-        value_pmu_A14 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A14);
-        value_pmu_A15 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
-        value_pmu_A16 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
-        value_pmu_A17 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A17);
-        value_pmu_A18 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A18);
-        value_pmu_A20 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A20);
-        value_pmu_A22 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A22);
+        value_pmu_A12 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A12);
+        value_pmu_A13 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A13);
+        value_pmu_A14 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A14);
+        value_pmu_A15 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
+        value_pmu_A16 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
+        value_pmu_A17 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A17);
+        value_pmu_A18 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A18);
+        value_pmu_A20 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A20);
+        value_pmu_A22 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A22);
         PRINT("BT power on: after write A12=0x%x, A13=0x%x, A14=0x%x, A15=0x%x, A16=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x\n",
               value_pmu_A12, value_pmu_A13, value_pmu_A14, value_pmu_A15, value_pmu_A16, value_pmu_A17, value_pmu_A18, value_pmu_A20,
               value_pmu_A22);
     }
     else    // turn off bt
     {
-        value_pmu_A16 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
+        value_pmu_A16 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
 
         value_pmu_A16 |= (0x1 << 30); //bit30 = 1, make sure can't enter power down when turn off BT
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
         PRINT("Enable RG_BT_PMU_A16 BIT30, FW can't enter power down!\n");
 
-        value_pmu_A12 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A12);
-        value_pmu_A13 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A13);
-        value_pmu_A14 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A14);
-        value_pmu_A15 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
+        value_pmu_A12 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A12);
+        value_pmu_A13 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A13);
+        value_pmu_A14 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A14);
+        value_pmu_A15 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
 
-        value_pmu_A17 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A17);
-        value_pmu_A18 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A18);
-        value_pmu_A20 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A20);
-        value_pmu_A22 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A22);
-        value_aon_a15 = g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
+        value_pmu_A17 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A17);
+        value_pmu_A18 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A18);
+        value_pmu_A20 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A20);
+        value_pmu_A22 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A22);
+        value_aon_a15 = w1_g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
 
         PRINT("BT power off: before write A12=0x%x, A13=0x%x, A14=0x%x, A15=0x%x, A16=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x, aon_a15=0x%x\n",
               value_pmu_A12, value_pmu_A13, value_pmu_A14, value_pmu_A15, value_pmu_A16, value_pmu_A17, value_pmu_A18, value_pmu_A20,
@@ -187,46 +187,46 @@ static int config_bt_pmu_reg(bool is_power_on)
 
         //if (value_pmu_A15 == 8)
         {
-            value_pmu_A16 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
+            value_pmu_A16 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
             value_pmu_A16 &= 0xFffffffE; //bit0 =0
-            g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
+            w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
             msleep(10);
 
-            value_pmu_A16 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
+            value_pmu_A16 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
             PRINT("RG_BT_PMU_A16_0 = 0x%x\n", value_pmu_A16);
 
             value_pmu_A16 &= 0xFffffffD; //bit1 =0
-            g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
+            w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
             msleep(10);
 
             if (value_pmu_A15 == 8)
             {
                 PRINT("Is sleep mode, wakeup first!\n");
-                value_pmu_A16 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
+                value_pmu_A16 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
                 PRINT("RG_BT_PMU_A16_1 = 0x%x\n", value_pmu_A16);
                 value_pmu_A16 |= 0x2; //bit1 = 1
-                g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
+                w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
                 msleep(10);
             }
 
-            value_pmu_A16 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
+            value_pmu_A16 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
             PRINT("RG_BT_PMU_A16_2 = 0x%x\n", value_pmu_A16);
         }
 
         value_pmu_A16 &= 0x7fffffff;
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
         msleep(1);
-        PRINT("BT power off:RG_BT_PMU_A16 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16));
+        PRINT("BT power off:RG_BT_PMU_A16 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16));
 
         PRINT("Check whether is active mode\n");
-        bt_pmu_status = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
+        bt_pmu_status = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
         bt_pmu_status_check = bt_pmu_status;
         //if (!strcmp(chip_name, "aml_w1u_s"))
         bt_pmu_status_check = bt_pmu_status & 0x0f;
         while (bt_pmu_status_check != PMU_ACT_MODE)
         {
             msleep(10);
-            bt_pmu_status = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
+            bt_pmu_status = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
             PRINT("wait wakeup, RG_BT_PMU_A15 = 0x%x\n", bt_pmu_status);
             wait_count++;
 
@@ -235,25 +235,25 @@ static int config_bt_pmu_reg(bool is_power_on)
 #if 0
                 /* set bt pmu fsm to PMU_SLEEP_MODE */
                 PRINT("Force BT power off\n");
-                host_req_status = g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
+                host_req_status = w1_g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
                 host_req_status |= (PMU_SLEEP_MODE << 1) | BIT(0);
-                g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
+                w1_g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
 
                 PRINT("Force BT power on\n");
                 /* release pmu fsm : bit0 */
-                host_req_status = g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
+                host_req_status = w1_g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
                 host_req_status &= ~BIT(0);
-                g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
+                w1_g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
                 msleep(10);
 #else
                 // add workaroud for pmu lock, when pmu lock trig the bnd let pmu fsm switch to next state.
-                pmu_fsm = (g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15) & 0xf);
+                pmu_fsm = (w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15) & 0xf);
 
                 //if (pmu_fsm == PMU_SLEEP_MODE)
                 //{
-                //	value_pmu_A16 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
+                //	value_pmu_A16 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
                 //	value_pmu_A16 |= 0x2;
-                //	g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
+                //	w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
                 //}
                 //else
                 {
@@ -265,8 +265,8 @@ static int config_bt_pmu_reg(bool is_power_on)
                     else
                         reg_addr_mapping_form_pmu_fsm = CHIP_BT_PMU_REG_BASE + ((pmu_fsm - 1) * 4);
 
-                    reg_data = g_w1_hif_ops.bt_hi_read_word(reg_addr_mapping_form_pmu_fsm);
-                    g_w1_hif_ops.bt_hi_write_word(reg_addr_mapping_form_pmu_fsm, ((reg_data & 0x7fffffff) + 1));
+                    reg_data = w1_g_w1_hif_ops.bt_hi_read_word(reg_addr_mapping_form_pmu_fsm);
+                    w1_g_w1_hif_ops.bt_hi_write_word(reg_addr_mapping_form_pmu_fsm, ((reg_data & 0x7fffffff) + 1));
                 }
                 msleep(50); // wait pmu wake
                 //g_funcs.aml_pwr_pwrsave_wake(g_power_down_domain);
@@ -276,64 +276,64 @@ static int config_bt_pmu_reg(bool is_power_on)
         }
 
         /* rg_bb_reset_man */
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A12, value_pmu_A12 | 0xc0);
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A12, value_pmu_A12 | 0xc0);
         msleep(1);
 
         /* reset bt */
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A22, 0x707);
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A22, 0x707);
         msleep(1);
-        PRINT("BT power off:RG_BT_PMU_A22 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A22));
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A18, 0x1787);
+        PRINT("BT power off:RG_BT_PMU_A22 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A22));
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A18, 0x1787);
         msleep(1);
-        PRINT("BT power off:RG_BT_PMU_A18 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A18));
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A20, 0x0);      //0x1f703007
+        PRINT("BT power off:RG_BT_PMU_A18 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A18));
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A20, 0x0);      //0x1f703007
         msleep(1);
-        PRINT("BT power off:RG_BT_PMU_A20 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A20));
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A17, 0x707);
+        PRINT("BT power off:RG_BT_PMU_A20 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A20));
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A17, 0x707);
         msleep(1);
-        PRINT("BT power off:RG_BT_PMU_A17 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A17));
+        PRINT("BT power off:RG_BT_PMU_A17 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A17));
 
         /* clear bt work flag for coex */
         //value_pmu_A16 &= 0x7fffffff;
-        //g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
-        //PRINT("BT power off:RG_BT_PMU_A16 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16));
+        //w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A16, value_pmu_A16);
+        //PRINT("BT power off:RG_BT_PMU_A16 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16));
 
-        value_pmu_A12 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A12);
-        value_pmu_A13 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A13);
-        value_pmu_A14 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A14);
-        value_pmu_A15 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
-        value_pmu_A16 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
-        value_pmu_A17 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A17);
-        value_pmu_A18 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A18);
-        value_pmu_A20 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A20);
-        value_pmu_A22 = g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A22);
+        value_pmu_A12 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A12);
+        value_pmu_A13 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A13);
+        value_pmu_A14 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A14);
+        value_pmu_A15 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A15);
+        value_pmu_A16 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A16);
+        value_pmu_A17 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A17);
+        value_pmu_A18 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A18);
+        value_pmu_A20 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A20);
+        value_pmu_A22 = w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A22);
         PRINT("BT power off: after write A12=0x%x, A13=0x%x, A14=0x%x, A15=0x%x, A16=0x%x, A17=0x%x, A18=0x%x, A20=0x%x, A22=0x%x\n",
               value_pmu_A12, value_pmu_A13, value_pmu_A14, value_pmu_A15, value_pmu_A16, value_pmu_A17, value_pmu_A18, value_pmu_A20,
               value_pmu_A22);
 
         /* clear bt work flag && mask */
-        g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A14, 0x0);
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_BT_PMU_A14, 0x0);
         PRINT("BT power off: %s, line=%d\n", __func__, __LINE__);
-        //PRINT("BT power off:RG_BT_PMU_A14 = 0x%x\n", g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A14));
+        //PRINT("BT power off:RG_BT_PMU_A14 = 0x%x\n", w1_g_w1_hif_ops.bt_hi_read_word(RG_BT_PMU_A14));
 
         /* set bt pmu fsm to PMU_SLEEP_MODE */
-        host_req_status = g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
+        host_req_status = w1_g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
         host_req_status |= (PMU_SLEEP_MODE << 1) | BIT(0);
-        g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
+        w1_g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
         PRINT("BT power off: %s, line=%d\n", __func__, __LINE__);
     }
 
     /* clear wifi keep alive, BIT(5)*/
-    host_req_status = g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
+    host_req_status = w1_g_w1_hif_ops.hi_bottom_read8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ);
     host_req_status &= ~BIT(5);
-    g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
+    w1_g_w1_hif_ops.hi_bottom_write8(SDIO_FUNC1, RG_BT_SDIO_PMU_HOST_REQ, host_req_status);
 
     reg_config_complete = 1;
 
     return ret;
 }
 
-extern unsigned char wifi_in_insmod;
+extern unsigned char w1_wifi_in_insmod;
 int  bt_aml_sdio_init(void)
 {
     int ret = 0;
@@ -344,7 +344,7 @@ int  bt_aml_sdio_init(void)
     if (!w1_sdio_driver_insmoded)
     {
         PRINT("===start register sdio common driver through bt sdio driver===\n");
-        aml_w1_sdio_init();
+        w1_aml_w1_sdio_init();
         msleep(10);
 
         while (!w1_sdio_after_porbe)
@@ -360,7 +360,7 @@ int  bt_aml_sdio_init(void)
 
     //if (!strcmp(chip_name, "aml_w1"))
     {
-        while (wifi_in_insmod)
+        while (w1_wifi_in_insmod)
         {
             PRINT("WIFI in insmod\n");
             msleep(10);
@@ -394,14 +394,14 @@ static int amlbt_sdio_probe(struct platform_device *dev)
 {
     int ret = bt_aml_insmod();
 
-    unsigned int reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
+    unsigned int reg_value = w1_g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
 
     printk("%s RG_AON_A15:%#x\n", __func__, reg_value);
 
     reg_value &= ~(1<<31);
     reg_value &= ~(1<<30);
-    g_w1_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
-    printk("RG_AON_A15:%#x", g_w1_hif_ops.bt_hi_read_word(RG_AON_A15));
+    w1_g_w1_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
+    printk("RG_AON_A15:%#x", w1_g_w1_hif_ops.bt_hi_read_word(RG_AON_A15));
     return ret;
 }
 
@@ -424,11 +424,11 @@ static int amlbt_sdio_remove(struct platform_device *dev)
 
 static int amlbt_sdio_suspend(struct platform_device *dev, pm_message_t state)
 {
-    unsigned int reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
+    unsigned int reg_value = w1_g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
     printk("%s RG_AON_A15:%#x\n", __func__, reg_value);
     reg_value |= (1<<31);
-    g_w1_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
-    printk("RG_AON_A15:%#x", g_w1_hif_ops.bt_hi_read_word(RG_AON_A15));
+    w1_g_w1_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
+    printk("RG_AON_A15:%#x", w1_g_w1_hif_ops.bt_hi_read_word(RG_AON_A15));
     return 0;
 }
 
@@ -437,11 +437,11 @@ static int amlbt_sdio_resume(struct platform_device *dev)
 #ifdef CONFIG_AMLOGIC_GX_SUSPEND
     if ((get_resume_method() != 3) && (get_resume_method() != 7))
     {
-        unsigned int reg_value = g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
+        unsigned int reg_value = w1_g_w1_hif_ops.bt_hi_read_word(RG_AON_A15);
         printk("%s RG_AON_A15:%#x\n", __func__, reg_value);
         reg_value &= ~(1<<31);
-        g_w1_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
-        printk("RG_AON_A15:%#x", g_w1_hif_ops.bt_hi_read_word(RG_AON_A15));
+        w1_g_w1_hif_ops.bt_hi_write_word(RG_AON_A15, reg_value);
+        printk("RG_AON_A15:%#x", w1_g_w1_hif_ops.bt_hi_read_word(RG_AON_A15));
     }
 #endif
     return 0;
@@ -600,7 +600,7 @@ static int bt_aml_insmod(void)
         PRINT("++++++sdio bt driver insmod start.++++++\n");
         reg_config_complete = 0;
 
-        set_wifi_bt_sdio_driver_bit(REGISTER_BT_SDIO, BT_BIT);
+        w1_set_wifi_bt_sdio_driver_bit(REGISTER_BT_SDIO, BT_BIT);
         ret = bt_aml_sdio_init();
         if (ret)
         {
@@ -628,13 +628,13 @@ static void bt_aml_rmmod(void)
         printk("\n");
         printk("\n");
         PRINT("++++++sdio bt driver rmmod start.++++++\n");
-        while (wifi_in_insmod)
+        while (w1_wifi_in_insmod)
         {
             PRINT("WIFI in insmod\n");
             msleep(10);
         }
         config_bt_pmu_reg(BT_PWR_OFF);
-        set_wifi_bt_sdio_driver_bit(UNREGISTER_BT_SDIO, BT_BIT);
+        w1_set_wifi_bt_sdio_driver_bit(UNREGISTER_BT_SDIO, BT_BIT);
         BTAML_exit();
         PRINT("------sdio bt driver rmmod end.------\n");
         printk("\n");

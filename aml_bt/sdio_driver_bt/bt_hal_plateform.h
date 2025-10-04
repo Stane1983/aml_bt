@@ -30,10 +30,10 @@
 
 extern unsigned char w1_sdio_driver_insmoded;
 extern unsigned char w1_sdio_after_porbe;
-extern struct amlw1_hif_ops g_w1_hif_ops;
+extern struct amlw1_hif_ops w1_g_w1_hif_ops;
 extern void amlwifi_set_sdio_host_clk(int clk);
-extern void set_wifi_bt_sdio_driver_bit(bool is_register, int shift);
-extern int  aml_w1_sdio_init(void);
+extern void w1_set_wifi_bt_sdio_driver_bit(bool is_register, int shift);
+extern int  w1_aml_w1_sdio_init(void);
 
 #define PRINT(...)      do { printk("btHAL->"); printk(__VA_ARGS__); } while (0)
 

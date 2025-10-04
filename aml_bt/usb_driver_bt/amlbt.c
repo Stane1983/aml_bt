@@ -180,7 +180,7 @@ static volatile unsigned char cmd_index = 0xff;
 static unsigned char dw_state = 0;
 //static unsigned char *type_buff = NULL;
 
-extern struct auc_hif_ops g_auc_hif_ops;
+extern struct auc_hif_ops w2_g_auc_hif_ops;
 extern struct aml_hif_sdio_ops g_hif_sdio_ops;
 extern struct aml_bus_state_detect bus_state_detect;
 
@@ -540,7 +540,7 @@ static void amlbt_usb_ram_init(void)
 
 static void amlbt_usb_write_word(unsigned int addr,unsigned int data, unsigned int ep)
 {
-    if (g_auc_hif_ops.hi_write_word_for_bt == NULL)
+    if (w2_g_auc_hif_ops.hi_write_word_for_bt == NULL)
     {
         printk("amlbt_usb_write_word NULL");
         return ;
@@ -548,7 +548,7 @@ static void amlbt_usb_write_word(unsigned int addr,unsigned int data, unsigned i
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
         printk("WW");
-        while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
+        while (w2_g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
@@ -556,7 +556,7 @@ static void amlbt_usb_write_word(unsigned int addr,unsigned int data, unsigned i
         printk("WWE");
     }
     USB_BEGIN_LOCK();
-    g_auc_hif_ops.hi_write_word_for_bt(addr, data, ep);
+    w2_g_auc_hif_ops.hi_write_word_for_bt(addr, data, ep);
     USB_END_LOCK();
 }
 /*
@@ -565,20 +565,20 @@ static void amlbt_usb_write_word_ext(unsigned int addr,unsigned int data, unsign
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
         printk("WW");
-        while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
+        while (w2_g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
         bt_recovery = 1;
         printk("WWE");
     }
-    g_auc_hif_ops.hi_write_word_for_bt(addr, data, ep);
+    w2_g_auc_hif_ops.hi_write_word_for_bt(addr, data, ep);
 }
 */
 static unsigned int amlbt_usb_read_word(unsigned int addr, unsigned int ep)
 {
     unsigned int value = 0;
-    if (g_auc_hif_ops.hi_read_word_for_bt == NULL)
+    if (w2_g_auc_hif_ops.hi_read_word_for_bt == NULL)
     {
         printk("amlbt_usb_read_word NULL");
         return 0;
@@ -586,7 +586,7 @@ static unsigned int amlbt_usb_read_word(unsigned int addr, unsigned int ep)
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
         printk("RW");
-        while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
+        while (w2_g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
@@ -594,13 +594,13 @@ static unsigned int amlbt_usb_read_word(unsigned int addr, unsigned int ep)
         printk("RWE");
     }
     USB_BEGIN_LOCK();
-    value = g_auc_hif_ops.hi_read_word_for_bt(addr, ep);
+    value = w2_g_auc_hif_ops.hi_read_word_for_bt(addr, ep);
     USB_END_LOCK();
     return value;
 }
 static void amlbt_usb_write_sram(unsigned char* buf, unsigned char* addr, unsigned int len, unsigned int ep)
 {
-    if (g_auc_hif_ops.hi_write_sram_for_bt == NULL)
+    if (w2_g_auc_hif_ops.hi_write_sram_for_bt == NULL)
     {
         printk("amlbt_usb_write_sram NULL");
         return;
@@ -608,7 +608,7 @@ static void amlbt_usb_write_sram(unsigned char* buf, unsigned char* addr, unsign
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
         printk("WS");
-        while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
+        while (w2_g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
@@ -616,13 +616,13 @@ static void amlbt_usb_write_sram(unsigned char* buf, unsigned char* addr, unsign
         printk("WSE");
     }
     USB_BEGIN_LOCK();
-    g_auc_hif_ops.hi_write_sram_for_bt(buf, addr, len, ep);
+    w2_g_auc_hif_ops.hi_write_sram_for_bt(buf, addr, len, ep);
     USB_END_LOCK();
 }
 #ifdef BT_USB_DBG
 static void amlbt_usb_read_sram(unsigned char* buf, unsigned char* addr, unsigned int len, unsigned int ep)
 {
-    if (g_auc_hif_ops.hi_read_sram_for_bt == NULL)
+    if (w2_g_auc_hif_ops.hi_read_sram_for_bt == NULL)
     {
         printk("hi_read_sram_for_bt NULL");
         return;
@@ -630,7 +630,7 @@ static void amlbt_usb_read_sram(unsigned char* buf, unsigned char* addr, unsigne
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
         printk("RS");
-        while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
+        while (w2_g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
@@ -638,14 +638,14 @@ static void amlbt_usb_read_sram(unsigned char* buf, unsigned char* addr, unsigne
         printk("RSE");
     }
     USB_BEGIN_LOCK();
-    g_auc_hif_ops.hi_read_sram_for_bt(buf, addr, len, ep);
+    w2_g_auc_hif_ops.hi_read_sram_for_bt(buf, addr, len, ep);
     USB_END_LOCK();
 }
 #endif
 
 static void amlbt_usb_read_sram_ext(unsigned char* buf, unsigned char* addr, unsigned int len, unsigned int ep)
 {
-    if (g_auc_hif_ops.hi_read_sram_for_bt == NULL)
+    if (w2_g_auc_hif_ops.hi_read_sram_for_bt == NULL)
     {
         BTF("hi_read_sram_for_bt NULL");
         return;
@@ -653,19 +653,19 @@ static void amlbt_usb_read_sram_ext(unsigned char* buf, unsigned char* addr, uns
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
         BTF("RS");
-        while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
+        while (w2_g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
         bt_recovery = 1;
         BTF("RSE");
     }
-    g_auc_hif_ops.hi_read_sram_for_bt(buf, addr, len, ep);
+    w2_g_auc_hif_ops.hi_read_sram_for_bt(buf, addr, len, ep);
 }
 
 static void amlbt_usb_write_sram_ext(unsigned char* buf, unsigned char* addr, unsigned int len, unsigned int ep)
 {
-    if (g_auc_hif_ops.hi_write_sram_for_bt == NULL)
+    if (w2_g_auc_hif_ops.hi_write_sram_for_bt == NULL)
     {
         BTF("hi_write_sram_for_bt NULL");
         return;
@@ -673,14 +673,14 @@ static void amlbt_usb_write_sram_ext(unsigned char* buf, unsigned char* addr, un
     while (bus_state_detect.bus_err || bus_state_detect.bus_reset_ongoing)
     {
         BTF("WS");
-        while (g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
+        while (w2_g_auc_hif_ops.hi_read_word(0xa10004, USB_EP4) != 0x1b8e)
         {
             usleep_range(20000, 20000);
         }
         bt_recovery = 1;
         BTF("WSE");
     }
-    g_auc_hif_ops.hi_write_sram_for_bt(buf, addr, len, ep);
+    w2_g_auc_hif_ops.hi_write_sram_for_bt(buf, addr, len, ep);
 }
 
 
@@ -1559,7 +1559,7 @@ static unsigned int amlbt_usb_recv_hci_event(unsigned char *buff, unsigned int c
     unsigned int len = 0;
     //unsigned int i = 0;
 
-    //g_event_fifo->w = (unsigned char *)(unsigned long)g_auc_hif_ops.hi_read_word_for_bt(hci_evt_fifo_wr_ptr, BT_EP);
+    //g_event_fifo->w = (unsigned char *)(unsigned long)w2_g_auc_hif_ops.hi_read_word_for_bt(hci_evt_fifo_wr_ptr, BT_EP);
     //g_event_fifo->w += (hci_evt_fifo_addr);
 
     BTD("%s\n", __func__);
@@ -1588,7 +1588,7 @@ static unsigned int amlbt_usb_recv_rx_type(unsigned char *buff, unsigned int cnt
 {
     unsigned int len = 0;
 
-    //g_rx_type_fifo->w = (unsigned char *)(unsigned long)g_auc_hif_ops.hi_read_word_for_bt(hci_rx_type_wr_ptr, BT_EP);
+    //g_rx_type_fifo->w = (unsigned char *)(unsigned long)w2_g_auc_hif_ops.hi_read_word_for_bt(hci_rx_type_wr_ptr, BT_EP);
     //g_rx_type_fifo->w += (hci_rx_type_fifo_addr);
 
     BTD("%s\n", __func__);
@@ -1615,7 +1615,7 @@ static unsigned int amlbt_usb_recv_data_index(unsigned char *buff, unsigned int 
 {
     unsigned int len = 0;
 
-    //g_rx_fifo->w = (unsigned char *)(unsigned long)g_auc_hif_ops.hi_read_word_for_bt(hci_rx_index_fifo_wr_ptr, BT_EP);
+    //g_rx_fifo->w = (unsigned char *)(unsigned long)w2_g_auc_hif_ops.hi_read_word_for_bt(hci_rx_index_fifo_wr_ptr, BT_EP);
     //g_rx_fifo->w += (hci_data_rx_index_fifo_addr);
 
     BTD("%s\n", __func__);
@@ -1889,8 +1889,8 @@ void amlbt_usb_download_firmware(void)
 
     //to do download bt fw
     printk("bt_usb_download_firmware:iccm size %#x\n", download_size);
-    //g_auc_hif_ops.bt_hi_write_word(0xf03050, 1);    //ram power down rg_ram_pd_shutdown_sw
-    //g_auc_hif_ops.bt_hi_write_word(REG_DEV_RESET, 0);    //pmu down
+    //w2_g_auc_hif_ops.bt_hi_write_word(0xf03050, 1);    //ram power down rg_ram_pd_shutdown_sw
+    //w2_g_auc_hif_ops.bt_hi_write_word(REG_DEV_RESET, 0);    //pmu down
 
     if (FAMILY_TYPE_IS_W1U(amlbt_if_type))
     {
@@ -2742,8 +2742,8 @@ static ssize_t amlbt_usb_char_write_fw(struct file *file_p,
         {
             BTA("REG_DEV_RESET start \n");
             download_end = 1;
-            if ((g_auc_hif_ops.hi_write_word_for_bt == NULL) || (g_auc_hif_ops.hi_read_word_for_bt == NULL) ||
-            (g_auc_hif_ops.hi_write_sram_for_bt == NULL) || (g_auc_hif_ops.hi_read_sram_for_bt == NULL))
+            if ((w2_g_auc_hif_ops.hi_write_word_for_bt == NULL) || (w2_g_auc_hif_ops.hi_read_word_for_bt == NULL) ||
+            (w2_g_auc_hif_ops.hi_write_sram_for_bt == NULL) || (w2_g_auc_hif_ops.hi_read_sram_for_bt == NULL))
             {
                 printk("USB Interface NULL");
             }
@@ -2870,8 +2870,8 @@ unsigned int btchr_poll(struct file *file, poll_table *wait)
     {
         mask |= POLLIN | POLLRDNORM;
     }
-    if ((g_auc_hif_ops.hi_write_word_for_bt == NULL) || (g_auc_hif_ops.hi_read_word_for_bt == NULL) ||
-    (g_auc_hif_ops.hi_write_sram_for_bt == NULL) || (g_auc_hif_ops.hi_read_sram_for_bt == NULL))
+    if ((w2_g_auc_hif_ops.hi_write_word_for_bt == NULL) || (w2_g_auc_hif_ops.hi_read_word_for_bt == NULL) ||
+    (w2_g_auc_hif_ops.hi_write_sram_for_bt == NULL) || (w2_g_auc_hif_ops.hi_read_sram_for_bt == NULL))
     {
         return mask;
     }
@@ -4785,8 +4785,8 @@ static int amlbt_usb_probe(struct platform_device *dev)
 	struct hci_dev *hdev;
 
     amlbt_usb_insmod();   //load
-    //g_auc_hif_ops.bt_hi_write_word((unsigned int)0x00a0d0e4, 0x8000007f);
-    //printk("%s, %#x", __func__, g_auc_hif_ops.bt_hi_read_word(0x00a0d0e4));
+    //w2_g_auc_hif_ops.bt_hi_write_word((unsigned int)0x00a0d0e4, 0x8000007f);
+    //printk("%s, %#x", __func__, w2_g_auc_hif_ops.bt_hi_read_word(0x00a0d0e4));
     BTF("%s \n", __func__);
 	/*
     amlbt_early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
