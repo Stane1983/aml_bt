@@ -78,8 +78,8 @@
 #define WIFI_DRV_PATH "/lib/modules/*/kernel/amlogic/wifi"
 #define BT_DRV_PATH "/lib/modules/*/kernel/amlogic/bt"
 #else
-#define WIFI_DRV_PATH "/lib/modules/extramodules"
-#define BT_DRV_PATH "/lib/modules/*/kernel/drivers/amlogic/bt"
+#define WIFI_DRV_PATH "/lib/modules/*/aml"
+#define BT_DRV_PATH "/lib/modules/*/aml"
 #endif
 
 #define AMLBT_IF_TYPE "amlbt_if_type="
