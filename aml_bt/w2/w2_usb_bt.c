@@ -325,7 +325,7 @@ extern struct usb_device *g_udev;
 extern struct aml_pm_type g_wifi_pm;
 extern struct aml_bus_state_detect bus_state_detect;
 extern unsigned char g_chip_function_ctrl;
-//extern bt_shutdown_func g_bt_shutdown_func;
+extern bt_shutdown_func g_bt_shutdown_func;
 static struct crg_msc_cbw *g_cmd_buf;
 static unsigned char *g_bluez_buf = NULL;
 static struct aml_bt_info *info;
